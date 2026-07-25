@@ -23,6 +23,7 @@
         'wizard/quick_pay_reject_wizard_views.xml',
         'views/quick_pay_views.xml',
         'views/quick_pay_portal_templates.xml',
+        'views/batch_views.xml',
         'report/quick_pay_receipt_report.xml',
     ],
     'assets': {

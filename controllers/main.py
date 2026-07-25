@@ -17,13 +17,18 @@ FEE_TYPES = [
 class QuickPayPortal(http.Controller):
 
     @http.route('/quick-pay', type='http', auth='public', website=True, sitemap=True)
-    def quick_pay_form(self, **kw):
+    def quick_pay_form(self, batch_id=None, fee_type=None, **kw):
         batches = request.env['student.batch'].sudo().search([('active', '=', True)])
+        form_values = {}
+        if batch_id:
+            form_values['batch_id'] = batch_id
+        if fee_type in dict(FEE_TYPES):
+            form_values['fee_type'] = fee_type
         return request.render('quick_pay.portal_quick_pay_form', {
             'batches': batches,
             'fee_types': FEE_TYPES,
             'error': None,
-            'form_values': {},
+            'form_values': form_values,
         })
 
     @http.route('/quick-pay/fee_amount', type='json', auth='public', website=True)
@@ -116,4 +121,38 @@ class QuickPayPortal(http.Controller):
     @http.route('/quick-pay/thank-you', type='http', auth='public', website=True)
     def quick_pay_thank_you(self, ref=None, **kw):
         return request.render('quick_pay.portal_quick_pay_thank_you', {'ref': ref})
+
+    @http.route('/quick-pay/batch/<int:batch_id>', type='http', auth='public',
+                website=True, sitemap=True)
+    def quick_pay_batch_info(self, batch_id, **kw):
+        """Shareable per-batch fee info page — shows every fee configured
+        for this batch (Reservation / Admission / Full Course) with a
+        direct 'Pay This' link into the Quick Pay form, pre-selected for
+        this batch and fee type."""
+        batch = request.env['student.batch'].sudo().browse(batch_id)
+        if not batch.exists() or not batch.active:
+            return request.render('quick_pay.portal_batch_not_found', {})
+
+        fee_cards = []
+        for code, label in FEE_TYPES:
+            record = request.env['quick.pay'].sudo().new({
+                'batch_id': batch.id, 'fee_type': code,
+            })
+            breakdown = record._resolve_fee_breakdown()
+            if breakdown['inclusive'] > 0:
+                fee_cards.append({
+                    'code': code, 'label': label,
+                    'amount': breakdown['inclusive'],
+                })
+
+        # "Pay the full amount" — the course's own total, which already
+        # includes the admission fee as a first instalment towards it
+        # (not stacked on top of it) — same math the payment form uses.
+        full_course = next((c for c in fee_cards if c['code'] == 'full_course'), None)
+
+        return request.render('quick_pay.portal_batch_fee_info', {
+            'batch': batch,
+            'fee_cards': fee_cards,
+            'full_course': full_course,
+        })
 

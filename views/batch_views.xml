@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_student_batch_form_inherit_quick_pay" model="ir.ui.view">
+        <field name="name">student.batch.form.quick.pay</field>
+        <field name="model">student.batch</field>
+        <field name="inherit_id" ref="student_details_19.view_student_batch_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <field name="fee_portal_url" widget="CopyClipboardChar" readonly="1"
+                       invisible="not fee_portal_url"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

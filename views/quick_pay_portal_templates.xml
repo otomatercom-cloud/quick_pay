@@ -165,6 +165,11 @@
                     feeTypeSel.addEventListener('change', refreshAmount);
                     planSel.addEventListener('change', refreshAmount);
                     phoneEl.addEventListener('blur', refreshAmount);
+
+                    // Pre-filled via a batch fee-info page link (?batch_id=&amp;fee_type=)
+                    if (batchSel.value &amp;&amp; feeTypeSel.value) {
+                        refreshAmount();
+                    }
                 })();
             </script>
         </t>
@@ -182,6 +187,63 @@
                         Our Accounts team will verify your payment shortly.
                     </p>
                     <a href="/quick-pay" class="btn btn-outline-primary mt-3">Submit Another</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_batch_fee_info" name="Quick Pay - Batch Fee Info">
+        <t t-call="website.layout">
+            <div id="wrap" class="quick-pay-wrap">
+                <div class="container py-5" style="max-width:640px;">
+                    <div class="text-center mb-4">
+                        <div class="qp-batch-kicker">Fee Details</div>
+                        <h1 class="fw-bold"><t t-esc="batch.name"/></h1>
+                        <p class="text-muted">
+                            Choose what you'd like to pay. Each option takes you
+                            straight to the payment form for this batch.
+                        </p>
+                    </div>
+
+                    <div t-if="not fee_cards" class="alert alert-warning">
+                        No fees have been configured for this batch yet. Please
+                        contact us directly.
+                    </div>
+
+                    <div class="qp-fee-cards">
+                        <t t-foreach="fee_cards" t-as="c">
+                            <a t-attf-href="/quick-pay?batch_id=#{batch.id}&amp;fee_type=#{c['code']}"
+                               t-attf-class="qp-fee-card #{'qp-fee-card-highlight' if c['code'] == 'full_course' else ''}">
+                                <div class="qp-fee-card-label">
+                                    <t t-esc="c['label']"/>
+                                    <span t-if="c['code'] == 'full_course'" class="badge text-bg-primary ms-1">Pay Full Amount</span>
+                                </div>
+                                <div class="qp-fee-card-amount">₹ <t t-esc="'{:,.2f}'.format(c['amount'])"/></div>
+                                <div class="qp-fee-card-cta">Pay this →</div>
+                            </a>
+                        </t>
+                    </div>
+
+                    <p class="text-muted text-center mt-4" style="font-size:12px;">
+                        Already paid something towards this batch? Enter your
+                        registered mobile number on the payment page and we'll
+                        show your actual remaining balance instead.
+                    </p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_batch_not_found" name="Quick Pay - Batch Not Found">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="container py-5 text-center" style="max-width:560px;">
+                    <h1 class="fw-bold">Batch Not Found</h1>
+                    <p class="text-muted">
+                        This batch link is invalid or no longer active.
+                        Please contact us for the correct payment link.
+                    </p>
+                    <a href="/quick-pay" class="btn btn-outline-primary mt-3">Go to Quick Pay</a>
                 </div>
             </div>
         </t>
