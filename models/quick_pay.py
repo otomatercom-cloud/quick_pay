@@ -196,6 +196,13 @@ class QuickPay(models.Model):
         else:
             incl = fs.amount_inclusive
             excl = fs.amount_exclusive
+        # Admission Fee is a separate charge added on top of the course
+        # fee (not absorbed into it) — e.g. lumpsum ₹3500 + admission
+        # ₹500 = ₹4000 "Full Course Fee".
+        admission_fs = self.batch_id.fee_structure_ids.filtered(
+            lambda f: f.fee_type == 'admission')
+        incl += sum(admission_fs.mapped('amount_inclusive'))
+        excl += sum(admission_fs.mapped('amount_exclusive'))
         return {
             'inclusive': incl, 'exclusive': excl,
             'gst': round(incl - excl, 2), 'gst_rate': fs.gst_rate,
@@ -395,17 +402,21 @@ class QuickPay(models.Model):
         # outstanding balance never appears anywhere.
         enrollment = student.enrollment_ids.filtered(lambda e: e.batch_id == self.batch_id)[:1]
         if not enrollment:
-            # total_fee is the course fee itself — Reservation/Admission
-            # Fee are a first instalment *towards* that total, not an
-            # extra charge on top of it. E.g. course fee ₹4000, admission
-            # fee ₹500 paid now → balance owed is ₹3500, not ₹4000.
-            total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
+            # total_fee = course fee + admission fee ADDED TOGETHER — they
+            # are two separate charges (registration fee + tuition), not
+            # one wrapping the other. E.g. lumpsum ₹3500 + admission ₹500
+            # = ₹4000 total; paying the ₹500 admission fee leaves a
+            # ₹3500 balance toward that combined total.
+            course_total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
                 else course_fs.amount_inclusive
+            admission_fs = self.batch_id.fee_structure_ids.filtered(
+                lambda f: f.fee_type == 'admission')
+            grand_total = course_total + sum(admission_fs.mapped('amount_inclusive'))
             enrollment = self.env['student.enrollment'].create({
                 'student_id': student.id,
                 'batch_id': self.batch_id.id,
                 'fee_structure_id': course_fs.id,
-                'total_fee': total,
+                'total_fee': grand_total,
                 'fee_type': course_fs.fee_type,
                 'gst_rate': course_fs.gst_rate,
             })
