@@ -57,6 +57,17 @@ class QuickPay(models.Model):
         string='Fee Amount ₹', digits=(10, 2),
         compute='_compute_fee_amount', store=True, readonly=True,
     )
+    base_amount = fields.Float(
+        string='Base Amount (Excl. GST) ₹', digits=(10, 2),
+        compute='_compute_fee_amount', store=True, readonly=True,
+    )
+    gst_amount = fields.Float(
+        string='GST ₹', digits=(10, 2),
+        compute='_compute_fee_amount', store=True, readonly=True,
+    )
+    gst_rate = fields.Char(
+        string='GST Rate', compute='_compute_fee_amount', store=True, readonly=True,
+    )
 
     payment_slip = fields.Binary(string='Payment Slip', attachment=True)
     payment_slip_filename = fields.Char()
@@ -78,6 +89,37 @@ class QuickPay(models.Model):
     enrollment_id = fields.Many2one('student.enrollment', readonly=True, copy=False)
     payment_id = fields.Many2one('student.fee.payment', readonly=True, copy=False)
 
+    # ── existing lead/student match preview (backend only — never exposed
+    # on the public portal, since showing "this number belongs to X" to an
+    # anonymous visitor would let anyone probe phone numbers) ────────────
+    existing_lead_id = fields.Many2one(
+        'leads.logic', compute='_compute_existing_match',
+        string='Matching Lead',
+    )
+    existing_student_id = fields.Many2one(
+        'student.details', compute='_compute_existing_match',
+        string='Matching Student',
+    )
+    existing_match_note = fields.Char(compute='_compute_existing_match')
+
+    @api.depends('phone')
+    def _compute_existing_match(self):
+        Lead = self.env['leads.logic'].sudo()
+        for rec in self:
+            lead = Lead.search([('phone_number', '=', rec.phone)], limit=1) if rec.phone else Lead
+            rec.existing_lead_id = lead.id if lead else False
+            rec.existing_student_id = lead.student_id.id if lead and lead.student_id else False
+            if lead and lead.student_id:
+                rec.existing_match_note = _(
+                    "This mobile number matches an existing student: %(name)s (Reg. No: %(reg)s)."
+                ) % {'name': lead.student_id.name, 'reg': lead.student_id.registration_no}
+            elif lead:
+                rec.existing_match_note = _(
+                    "This mobile number matches an existing lead: %s (not yet admitted)."
+                ) % lead.name
+            else:
+                rec.existing_match_note = False
+
     # ── computed fee resolution (never hardcoded) ───────────────────────
     @api.depends('batch_id')
     def _compute_available_fee_structures(self):
@@ -88,24 +130,53 @@ class QuickPay(models.Model):
                 if rec.batch_id else self.env['fee.structure']
             )
 
-    def _resolve_fee_amount(self):
+    def _resolve_fee_breakdown(self):
+        """Returns {'inclusive', 'exclusive', 'gst', 'gst_rate'} resolved
+        from the batch's fee.structure — never hardcoded, and computed the
+        same way for portal preview, the stored fields, and reporting."""
         self.ensure_one()
+        zero = {'inclusive': 0.0, 'exclusive': 0.0, 'gst': 0.0, 'gst_rate': '0'}
         if not self.batch_id or not self.fee_type:
-            return 0.0
+            return zero
         if self.fee_type in ('reservation', 'admission'):
             fs = self.batch_id.fee_structure_ids.filtered(
                 lambda f: f.fee_type == self.fee_type)[:1]
-            return sum(fs.mapped('amount_inclusive'))
+            if not fs:
+                return zero
+            incl = sum(fs.mapped('amount_inclusive'))
+            excl = sum(fs.mapped('amount_exclusive'))
+            return {
+                'inclusive': incl, 'exclusive': excl,
+                'gst': round(incl - excl, 2), 'gst_rate': fs[:1].gst_rate,
+            }
         # full_course
         fs = self.fee_structure_id or self.available_fee_structure_ids[:1]
         if not fs:
-            return 0.0
-        return fs.total_fee_amount if fs.fee_type == 'installment' else fs.amount_inclusive
+            return zero
+        if fs.fee_type == 'installment':
+            incl = fs.total_fee_amount
+            rate = float(fs.gst_rate or 0)
+            excl = round(incl / (1 + rate / 100), 2) if rate else incl
+        else:
+            incl = fs.amount_inclusive
+            excl = fs.amount_exclusive
+        return {
+            'inclusive': incl, 'exclusive': excl,
+            'gst': round(incl - excl, 2), 'gst_rate': fs.gst_rate,
+        }
+
+    def _resolve_fee_amount(self):
+        self.ensure_one()
+        return self._resolve_fee_breakdown()['inclusive']
 
     @api.depends('batch_id', 'fee_type', 'fee_structure_id')
     def _compute_fee_amount(self):
         for rec in self:
-            rec.fee_amount = rec._resolve_fee_amount()
+            breakdown = rec._resolve_fee_breakdown()
+            rec.fee_amount = breakdown['inclusive']
+            rec.base_amount = breakdown['exclusive']
+            rec.gst_amount = breakdown['gst']
+            rec.gst_rate = breakdown['gst_rate']
 
     @api.onchange('batch_id', 'fee_type', 'fee_structure_id')
     def _onchange_fee_inputs(self):

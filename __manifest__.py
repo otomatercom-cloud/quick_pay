@@ -29,6 +29,11 @@
         'web.assets_frontend': [
             'quick_pay/static/src/css/quick_pay_portal.css',
         ],
+        'web.assets_backend': [
+            'quick_pay/static/src/css/fee_dashboard.css',
+            'quick_pay/static/src/js/fee_dashboard.js',
+            'quick_pay/static/src/xml/fee_dashboard.xml',
+        ],
     },
     'installable': True,
     'application': True,

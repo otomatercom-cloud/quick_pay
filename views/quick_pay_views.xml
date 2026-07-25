@@ -43,6 +43,7 @@
                 <field name="batch_id"/>
                 <field name="fee_type" widget="badge"/>
                 <field name="fee_amount" string="Amount ₹" sum="Total ₹"/>
+                <field name="existing_student_id" string="Matches" optional="show"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'converted'"
                        decoration-info="state == 'submitted'"
@@ -64,6 +65,7 @@
                 <field name="fee_type"/>
                 <field name="fee_amount"/>
                 <field name="state"/>
+                <field name="existing_student_id"/>
                 <templates>
                     <t t-name="card">
                         <div class="oe_kanban_card oe_kanban_global_click p-2">
@@ -72,6 +74,9 @@
                             </div>
                             <div style="color:#64748b;font-size:12px;">
                                 <field name="batch_id"/> · <field name="phone"/>
+                            </div>
+                            <div class="mt-1" invisible="not existing_student_id">
+                                <span class="badge text-bg-info">🔎 Matches existing student</span>
                             </div>
                             <div class="mt-1">
                                 <span class="badge rounded-pill text-bg-light">
@@ -120,6 +125,13 @@
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
+                    <div class="alert alert-info d-flex align-items-center" role="alert"
+                         invisible="not existing_match_note">
+                        <span>🔎&#160;</span>
+                        <field name="existing_match_note" readonly="1" nolabel="1"/>
+                    </div>
+                    <field name="existing_lead_id" invisible="1"/>
+                    <field name="existing_student_id" invisible="1"/>
                     <group>
                         <group string="Student">
                             <field name="student_name"/>
@@ -157,6 +169,12 @@
         </field>
     </record>
 
+    <!-- ── Fee Dashboard (OWL client action) ─────────────────────────────── -->
+    <record id="action_fee_dashboard" model="ir.actions.client">
+        <field name="name">Fee Dashboard</field>
+        <field name="tag">quick_pay.fee_dashboard</field>
+    </record>
+
     <!-- ── Actions ────────────────────────────────────────────────────────── -->
     <record id="action_quick_pay_all" model="ir.actions.act_window">
         <field name="name">All Payments</field>
@@ -190,8 +208,11 @@
     </record>
 
     <!-- ── Menu ───────────────────────────────────────────────────────────── -->
-    <menuitem id="menu_quick_pay_root" name="Quick Pay" sequence="20"
+    <menuitem id="menu_quick_pay_root" name="Accounts" sequence="20"
               groups="quick_pay.group_quick_pay_user"/>
+    <menuitem id="menu_fee_dashboard" name="Fee Dashboard"
+              parent="menu_quick_pay_root" action="action_fee_dashboard" sequence="5"
+              groups="quick_pay.group_quick_pay_accounts"/>
     <menuitem id="menu_quick_pay_pending" name="Pending Payments"
               parent="menu_quick_pay_root" action="action_quick_pay_pending" sequence="10"/>
     <menuitem id="menu_quick_pay_verified" name="Verified"

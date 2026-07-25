@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="quick_pay.FeeDashboard">
+<div class="o_fee_dashboard">
+
+    <!-- ── Header ─────────────────────────────────────────────────── -->
+    <div class="o_fd_header">
+        <div>
+            <div class="o_fd_kicker">Accounts</div>
+            <h1>Fee Dashboard</h1>
+            <p>Quick Pay collections — reservation, admission &amp; course fees</p>
+        </div>
+        <div class="o_fd_header_actions">
+            <button type="button" class="btn btn-light"
+                    t-on-click="loadData" t-att-disabled="state.loading">
+                <i t-attf-class="fa {{ state.loading ? 'fa-spinner fa-spin' : 'fa-refresh' }} me-1"/>Refresh
+            </button>
+            <button type="button" class="btn btn-secondary" t-on-click="openPending">
+                <i class="fa fa-clock-o me-1"/>Pending Payments
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Date filter bar ────────────────────────────────────────── -->
+    <div class="o_fd_filterbar">
+        <div class="o_fd_quick">
+            <button type="button"
+                    t-attf-class="btn btn-sm {{ state.activeRange === 'today' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    t-on-click="() => this.setQuickRange('today')">Today</button>
+            <button type="button"
+                    t-attf-class="btn btn-sm {{ state.activeRange === 'yesterday' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    t-on-click="() => this.setQuickRange('yesterday')">Yesterday</button>
+            <button type="button"
+                    t-attf-class="btn btn-sm {{ state.activeRange === 'week' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    t-on-click="() => this.setQuickRange('week')">Last 7 Days</button>
+            <button type="button"
+                    t-attf-class="btn btn-sm {{ state.activeRange === 'month' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    t-on-click="() => this.setQuickRange('month')">This Month</button>
+        </div>
+        <div class="o_fd_dates">
+            <label>From</label>
+            <input type="date" class="form-control form-control-sm"
+                   t-att-value="state.dateFrom" t-on-change="onDateFromChange"/>
+            <label>To</label>
+            <input type="date" class="form-control form-control-sm"
+                   t-att-value="state.dateTo" t-on-change="onDateToChange"/>
+            <button type="button" class="btn btn-sm btn-primary"
+                    t-on-click="applyFilter" t-att-disabled="state.loading">
+                <i class="fa fa-filter me-1"/>Apply
+            </button>
+        </div>
+    </div>
+
+    <div t-if="state.error" class="alert alert-danger mt-3" t-esc="state.error"/>
+
+    <t t-if="state.loading">
+        <div class="o_fd_skeleton">
+            <div class="o_fd_skeleton_cards">
+                <t t-foreach="[1,2,3,4,5,6]" t-as="n" t-key="n">
+                    <div class="o_fd_skeleton_card"/>
+                </t>
+            </div>
+            <div class="o_fd_skeleton_table"/>
+        </div>
+    </t>
+
+    <t t-else="">
+        <!-- ── Summary cards ──────────────────────────────────────── -->
+        <div class="o_fd_cards">
+            <div class="o_fd_card o_fd_card_total">
+                <div class="o_fd_card_icon"><i class="fa fa-money"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_collected)"/></div>
+                <div class="o_fd_card_label">Total Collected</div>
+            </div>
+            <div class="o_fd_card o_fd_card_admission">
+                <div class="o_fd_card_icon"><i class="fa fa-graduation-cap"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.admission_total)"/></div>
+                <div class="o_fd_card_label">Admission Fee</div>
+            </div>
+            <div class="o_fd_card o_fd_card_reservation">
+                <div class="o_fd_card_icon"><i class="fa fa-bookmark"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.reservation_total)"/></div>
+                <div class="o_fd_card_label">Reservation Fee</div>
+            </div>
+            <div class="o_fd_card o_fd_card_course">
+                <div class="o_fd_card_icon"><i class="fa fa-book"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.full_course_total)"/></div>
+                <div class="o_fd_card_label">Full Course Fee</div>
+            </div>
+            <div class="o_fd_card o_fd_card_pending" style="cursor:pointer;" t-on-click="openPending">
+                <div class="o_fd_card_icon"><i class="fa fa-clock-o"/></div>
+                <div class="o_fd_card_value"><t t-esc="summary.pending_total"/></div>
+                <div class="o_fd_card_label">Pending (all time) — <t t-esc="summary.pending_count"/> in range</div>
+            </div>
+            <div class="o_fd_card o_fd_card_gst">
+                <div class="o_fd_card_icon"><i class="fa fa-percent"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_gst)"/></div>
+                <div class="o_fd_card_label">GST Payable</div>
+            </div>
+        </div>
+
+        <!-- ── Revenue breakdown (GST) ────────────────────────────── -->
+        <div class="o_fd_section">
+            <h2>Revenue Breakdown</h2>
+            <p class="text-muted" style="font-size:12px;margin-top:-6px;">
+                Net revenue is what the school keeps; GST is collected on behalf of
+                the government and isn't income. There's no expense tracking in
+                Quick Pay, so this is a revenue/GST split, not a full profit &amp; loss
+                statement.
+            </p>
+            <table class="table table-sm o_fd_gst_table">
+                <tr>
+                    <td>Total Collected (Incl. GST)</td>
+                    <td class="text-end"><strong>₹ <t t-esc="fmt(summary.total_collected)"/></strong></td>
+                </tr>
+                <tr>
+                    <td>Net Revenue (Excl. GST)</td>
+                    <td class="text-end">₹ <t t-esc="fmt(summary.total_base)"/></td>
+                </tr>
+                <tr>
+                    <td>GST Payable</td>
+                    <td class="text-end">₹ <t t-esc="fmt(summary.total_gst)"/></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ── Day-wise chart ──────────────────────────────────────── -->
+        <div class="o_fd_section">
+            <h2>Day-wise Collection</h2>
+            <div class="o_fd_daychart">
+                <t t-foreach="daywise" t-as="d" t-key="d.date">
+                    <div class="o_fd_daybar_wrap" t-att-title="d.date + ': ₹' + fmt(d.total_collected)">
+                        <div class="o_fd_daybar"
+                             t-att-style="'height:' + Math.max(4, (d.total_collected / maxDayTotal) * 100) + '%;'"/>
+                        <div class="o_fd_daylabel"><t t-esc="d.date.slice(5)"/></div>
+                    </div>
+                </t>
+            </div>
+        </div>
+
+        <!-- ── Batch-wise table ────────────────────────────────────── -->
+        <div class="o_fd_section">
+            <h2>By Batch</h2>
+            <table class="table table-sm o_fd_batch_table">
+                <thead>
+                    <tr>
+                        <th>Batch</th>
+                        <th class="text-end">Reservation ₹</th>
+                        <th class="text-end">Admission ₹</th>
+                        <th class="text-end">Course ₹</th>
+                        <th class="text-end">Total ₹</th>
+                        <th class="text-end">GST ₹</th>
+                        <th class="text-end">Pending</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-if="!batches.length">
+                        <td colspan="7" class="text-center text-muted">No collections in this range.</td>
+                    </tr>
+                    <tr t-foreach="batches" t-as="b" t-key="b.batch_id"
+                        style="cursor:pointer;" t-on-click="() => this.openBatchRequests(b)">
+                        <td><strong t-esc="b.batch_name"/></td>
+                        <td class="text-end" t-esc="fmt(b.reservation_total)"/>
+                        <td class="text-end" t-esc="fmt(b.admission_total)"/>
+                        <td class="text-end" t-esc="fmt(b.full_course_total)"/>
+                        <td class="text-end"><strong t-esc="fmt(b.total_collected)"/></td>
+                        <td class="text-end" t-esc="fmt(b.gst_total)"/>
+                        <td class="text-end">
+                            <span t-if="b.pending_count" class="badge text-bg-warning" t-esc="b.pending_count"/>
+                            <span t-else="">—</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </t>
+</div>
+</t>
+</templates>

@@ -1,0 +1,198 @@
+/* Fee Dashboard — plain CSS (Odoo 19: no SCSS in assets), matches
+   custom_leads_19's Call Report dashboard styling for visual consistency. */
+
+.o_fee_dashboard {
+    height: 100%;
+    overflow-y: auto;
+    padding: 20px 24px 40px;
+    background: #f6f7fb;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.o_fd_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.o_fd_kicker {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #6366f1;
+    font-weight: 700;
+}
+.o_fd_header h1 {
+    margin: 2px 0 2px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+}
+.o_fd_header p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 13px;
+}
+.o_fd_header_actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Filter bar ─────────────────────────────────────────────────── */
+.o_fd_filterbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+.o_fd_quick {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.o_fd_dates {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.o_fd_dates label {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 0 2px;
+}
+
+/* ── Summary cards ──────────────────────────────────────────────── */
+.o_fd_cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+.o_fd_card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+}
+.o_fd_card_icon {
+    font-size: 18px;
+    color: #9ca3af;
+    margin-bottom: 8px;
+}
+.o_fd_card_value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #111827;
+}
+.o_fd_card_label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+.o_fd_card_total { border-top: 3px solid #2563eb; }
+.o_fd_card_admission { border-top: 3px solid #16a34a; }
+.o_fd_card_reservation { border-top: 3px solid #7c3aed; }
+.o_fd_card_course { border-top: 3px solid #0891b2; }
+.o_fd_card_pending { border-top: 3px solid #d97706; }
+.o_fd_card_gst { border-top: 3px solid #dc2626; }
+
+/* ── Sections ───────────────────────────────────────────────────── */
+.o_fd_section {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 18px;
+}
+.o_fd_section h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 10px;
+}
+
+.o_fd_gst_table td {
+    border: none;
+    padding: 6px 4px;
+}
+
+.o_fd_batch_table th {
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+}
+.o_fd_batch_table td {
+    vertical-align: middle;
+}
+.o_fd_batch_table tr:hover {
+    background: #f9fafb;
+}
+
+/* ── Day-wise bar chart ─────────────────────────────────────────── */
+.o_fd_daychart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 140px;
+    padding-top: 10px;
+    overflow-x: auto;
+}
+.o_fd_daybar_wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    min-width: 28px;
+}
+.o_fd_daybar {
+    width: 18px;
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+    border-radius: 4px 4px 0 0;
+    min-height: 4px;
+}
+.o_fd_daylabel {
+    font-size: 10px;
+    color: #9ca3af;
+    margin-top: 4px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+}
+
+/* ── Loading skeleton ───────────────────────────────────────────── */
+.o_fd_skeleton_cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+.o_fd_skeleton_card {
+    height: 90px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #eef0f4 25%, #e5e7eb 37%, #eef0f4 63%);
+    background-size: 400% 100%;
+    animation: o_fd_shimmer 1.4s ease infinite;
+}
+.o_fd_skeleton_table {
+    height: 220px;
+    margin-top: 18px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #eef0f4 25%, #e5e7eb 37%, #eef0f4 63%);
+    background-size: 400% 100%;
+    animation: o_fd_shimmer 1.4s ease infinite;
+}
+@keyframes o_fd_shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
