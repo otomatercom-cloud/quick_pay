@@ -10,7 +10,7 @@ class StudentBatchFeePortalLink(models.Model):
              "'Pay this' button straight into Quick Pay for each fee type.",
     )
 
-    @api.depends('id')
+    @api.depends()
     def _compute_fee_portal_url(self):
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
         for rec in self:
