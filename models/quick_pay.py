@@ -381,16 +381,17 @@ class QuickPay(models.Model):
         # outstanding balance never appears anywhere.
         enrollment = student.enrollment_ids.filtered(lambda e: e.batch_id == self.batch_id)[:1]
         if not enrollment:
+            # total_fee is the course fee itself — Reservation/Admission
+            # Fee are a first instalment *towards* that total, not an
+            # extra charge on top of it. E.g. course fee ₹4000, admission
+            # fee ₹500 paid now → balance owed is ₹3500, not ₹4000.
             total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
                 else course_fs.amount_inclusive
-            admission_fs = self.batch_id.fee_structure_ids.filtered(
-                lambda f: f.fee_type == 'admission')
-            grand_total = total + sum(admission_fs.mapped('amount_inclusive'))
             enrollment = self.env['student.enrollment'].create({
                 'student_id': student.id,
                 'batch_id': self.batch_id.id,
                 'fee_structure_id': course_fs.id,
-                'total_fee': grand_total,
+                'total_fee': total,
                 'fee_type': course_fs.fee_type,
                 'gst_rate': course_fs.gst_rate,
             })
