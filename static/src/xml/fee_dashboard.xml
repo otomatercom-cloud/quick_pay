@@ -97,7 +97,7 @@
                 <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_gst)"/></div>
                 <div class="o_fd_card_label">GST Payable</div>
             </div>
-            <div class="o_fd_card o_fd_card_balance">
+            <div class="o_fd_card o_fd_card_balance" style="cursor:pointer;" t-on-click="openAllBalances">
                 <div class="o_fd_card_icon"><i class="fa fa-exclamation-triangle"/></div>
                 <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_balance_due)"/></div>
                 <div class="o_fd_card_label">Outstanding Balance (all batches)</div>
@@ -172,7 +172,9 @@
                         <td class="text-end"><strong t-esc="fmt(b.total_collected)"/></td>
                         <td class="text-end" t-esc="fmt(b.gst_total)"/>
                         <td class="text-end">
-                            <span t-if="b.balance_due" class="text-warning fw-bold" t-esc="fmt(b.balance_due)"/>
+                            <span t-if="b.balance_due" class="text-warning fw-bold o_fd_balance_link"
+                                  t-on-click="(ev) => this.openBatchBalance(b, ev)"
+                                  t-esc="fmt(b.balance_due)"/>
                             <span t-else="">—</span>
                         </td>
                         <td class="text-end">

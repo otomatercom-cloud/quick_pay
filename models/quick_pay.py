@@ -344,10 +344,9 @@ class QuickPay(models.Model):
         else:
             # Reuse custom_leads_19's own field-mapping logic
             # (LeadAdmissionWizard._prepare_student_vals) via an unsaved
-            # wizard instance, then replicate its "full mode" admission
-            # exactly as action_confirm_admission does — done inline
-            # rather than calling that method directly because it branches
-            # on an ir.config_parameter ('admission_batch_required') that
+            # wizard instance — done inline rather than calling
+            # action_confirm_admission() directly because it branches on
+            # an ir.config_parameter ('admission_batch_required') that
             # Quick Pay must not depend on: Quick Pay always has a batch
             # and a fee plan resolved, so it always wants full admission.
             wiz = self.env['lead.admission.wizard'].new({
@@ -356,21 +355,6 @@ class QuickPay(models.Model):
                 'fee_structure_id': course_fs.id,
             })
             student = self.env['student.details'].create(wiz._prepare_student_vals())
-
-            total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
-                else course_fs.amount_inclusive
-            admission_fs = self.batch_id.fee_structure_ids.filtered(
-                lambda f: f.fee_type == 'admission')
-            grand_total = total + sum(admission_fs.mapped('amount_inclusive'))
-
-            self.env['student.enrollment'].create({
-                'student_id': student.id,
-                'batch_id': self.batch_id.id,
-                'fee_structure_id': course_fs.id,
-                'total_fee': grand_total,
-                'fee_type': course_fs.fee_type,
-                'gst_rate': course_fs.gst_rate,
-            })
 
             lead.write({
                 'student_id': student.id,
@@ -388,8 +372,28 @@ class QuickPay(models.Model):
                 "Student admission completed via Quick Pay (%s)."
             ) % self.name)
 
-        enrollment = student.enrollment_ids.filtered(
-            lambda e: e.batch_id == self.batch_id)[:1] or student.enrollment_ids[:1]
+        # Ensure an enrollment exists for THIS batch specifically — this
+        # must not depend on whether the student record is brand-new.
+        # A student who already existed (e.g. a prior lead, or already
+        # enrolled in a different batch) still needs a fresh enrollment
+        # created here the first time they pay towards *this* batch,
+        # otherwise the payment has nothing to attach to and the
+        # outstanding balance never appears anywhere.
+        enrollment = student.enrollment_ids.filtered(lambda e: e.batch_id == self.batch_id)[:1]
+        if not enrollment:
+            total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
+                else course_fs.amount_inclusive
+            admission_fs = self.batch_id.fee_structure_ids.filtered(
+                lambda f: f.fee_type == 'admission')
+            grand_total = total + sum(admission_fs.mapped('amount_inclusive'))
+            enrollment = self.env['student.enrollment'].create({
+                'student_id': student.id,
+                'batch_id': self.batch_id.id,
+                'fee_structure_id': course_fs.id,
+                'total_fee': grand_total,
+                'fee_type': course_fs.fee_type,
+                'gst_rate': course_fs.gst_rate,
+            })
 
         payment = False
         if self.fee_amount > 0 and enrollment:

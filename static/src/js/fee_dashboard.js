@@ -135,6 +135,36 @@ export class FeeDashboard extends Component {
             target: "current",
         });
     }
+
+    openAllBalances() {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: "Outstanding Balance — All Batches",
+            res_model: "student.enrollment",
+            view_mode: "list,form",
+            views: [[false, "list"], [false, "form"]],
+            domain: [["due_amount", ">", 0]],
+            target: "current",
+        });
+    }
+
+    openBatchBalance(batch, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `Balance Due — ${batch.batch_name}`,
+            res_model: "student.enrollment",
+            view_mode: "list,form",
+            views: [[false, "list"], [false, "form"]],
+            domain: [
+                ["batch_id", "=", batch.batch_id],
+                ["due_amount", ">", 0],
+            ],
+            target: "current",
+        });
+    }
 }
 
 registry

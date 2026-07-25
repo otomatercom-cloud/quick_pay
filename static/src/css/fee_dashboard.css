@@ -139,6 +139,10 @@
 .o_fd_batch_table tr:hover {
     background: #f9fafb;
 }
+.o_fd_balance_link {
+    cursor: pointer;
+    text-decoration: underline dotted;
+}
 
 /* ── Day-wise bar chart ─────────────────────────────────────────── */
 .o_fd_daychart {
