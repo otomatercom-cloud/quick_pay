@@ -33,6 +33,16 @@ class QuickPayPortal(http.Controller):
             'form_values': form_values,
         })
 
+    @http.route('/quick-pay/check_status', type='json', auth='public', website=True)
+    def quick_pay_check_status(self, batch_id=None, phone=None, **kw):
+        """Used by the main payment form once batch+phone are both known —
+        tells the UI whether to restrict Fee Type to just the balance
+        (has_balance) or show the completion message (fully_paid)."""
+        status = request.env['quick.pay'].sudo().check_batch_payment_status(batch_id, phone)
+        if status['status'] != 'new':
+            status['company_name'] = request.env.company.name
+        return status
+
     @http.route('/quick-pay/fee_amount', type='json', auth='public', website=True)
     def quick_pay_fee_amount(self, batch_id=None, fee_type=None, fee_structure_id=None,
                               phone=None, **kw):
@@ -159,12 +169,18 @@ class QuickPayPortal(http.Controller):
 
     @http.route('/quick-pay/batch_fee_amounts', type='json', auth='public', website=True)
     def quick_pay_batch_fee_amounts(self, batch_id=None, phone=None, **kw):
-        """Used by the batch fee-info page's 'Check My Balance' box —
-        returns every fee type's amount for this batch, personalized to
-        the phone number if it matches an existing student, without
-        making the visitor go to the payment form first."""
+        """Used by the batch fee-info page's 'Check My Balance' box.
+        Returns one of three states: 'new' (show all fee options),
+        'has_balance' (show only the remaining balance), or 'fully_paid'
+        (show a completion message instead of any payment option)."""
         if not batch_id:
-            return {'fees': []}
+            return {'status': 'new', 'fees': []}
+
+        status = request.env['quick.pay'].sudo().check_batch_payment_status(batch_id, phone)
+        if status['status'] != 'new':
+            status['company_name'] = request.env.company.name
+            return status
+
         fees = []
         for code, label in FEE_TYPES:
             record = request.env['quick.pay'].sudo().new({
@@ -177,5 +193,5 @@ class QuickPayPortal(http.Controller):
                     'amount': breakdown['inclusive'],
                     'is_balance': breakdown['is_balance'],
                 })
-        return {'fees': fees}
+        return {'status': 'new', 'fees': fees}
 

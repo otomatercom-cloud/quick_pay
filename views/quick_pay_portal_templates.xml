@@ -14,7 +14,13 @@
 
                     <div t-if="error" class="alert alert-danger" t-esc="error"/>
 
-                    <form action="/quick-pay/submit" method="post"
+                    <div id="qp_welcome_panel" class="qp-welcome-panel" style="display:none;">
+                        <div class="qp-welcome-emoji">🎉</div>
+                        <h2>You've Completed Full Payment!</h2>
+                        <p>Welcome to the <span id="qp_welcome_company">Otomater</span> Family.</p>
+                    </div>
+
+                    <form id="qp_main_form" action="/quick-pay/submit" method="post"
                           enctype="multipart/form-data" class="quick-pay-card">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
@@ -61,7 +67,7 @@
                                 <select name="fee_type" id="qp_fee_type" class="form-select" required="required">
                                     <option value="">-- Select Fee Type --</option>
                                     <t t-foreach="fee_types" t-as="ft">
-                                        <option t-att-value="ft[0]"
+                                        <option t-att-value="ft[0]" t-att-data-code="ft[0]"
                                                 t-att-selected="'selected' if ft[0] == form_values.get('fee_type') else None">
                                             <t t-esc="ft[1]"/>
                                         </option>
@@ -112,6 +118,52 @@
                     var amountEl = document.getElementById('qp_amount');
                     var amountLabelEl = document.getElementById('qp_amount_label');
                     var amountNoteEl = document.getElementById('qp_amount_note');
+                    var welcomePanel = document.getElementById('qp_welcome_panel');
+                    var welcomeCompany = document.getElementById('qp_welcome_company');
+                    var mainForm = document.getElementById('qp_main_form');
+
+                    function setFeeTypeOptionsEnabled(onlyFullCourse) {
+                        feeTypeSel.querySelectorAll('option[data-code]').forEach(function (opt) {
+                            var isFullCourse = opt.getAttribute('data-code') === 'full_course';
+                            opt.disabled = onlyFullCourse &amp;&amp; !isFullCourse;
+                            opt.style.display = (onlyFullCourse &amp;&amp; !isFullCourse) ? 'none' : '';
+                        });
+                        if (onlyFullCourse &amp;&amp; feeTypeSel.value !== 'full_course') {
+                            feeTypeSel.value = 'full_course';
+                        }
+                    }
+
+                    function checkStatus() {
+                        var batchId = batchSel.value;
+                        var phone = phoneEl.value.trim();
+                        if (!batchId || !phone) {
+                            mainForm.style.display = '';
+                            welcomePanel.style.display = 'none';
+                            setFeeTypeOptionsEnabled(false);
+                            return;
+                        }
+                        fetch('/quick-pay/check_status', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                jsonrpc: '2.0', method: 'call',
+                                params: {batch_id: batchId, phone: phone}
+                            })
+                        }).then(function (r) { return r.json(); })
+                          .then(function (data) {
+                            var result = data.result || {};
+                            if (result.status === 'fully_paid') {
+                                mainForm.style.display = 'none';
+                                welcomeCompany.textContent = result.company_name || 'Otomater';
+                                welcomePanel.style.display = '';
+                                return;
+                            }
+                            mainForm.style.display = '';
+                            welcomePanel.style.display = 'none';
+                            setFeeTypeOptionsEnabled(result.status === 'has_balance');
+                            refreshAmount();
+                        });
+                    }
 
                     function refreshAmount() {
                         var batchId = batchSel.value;
@@ -161,13 +213,15 @@
                         });
                     }
 
-                    batchSel.addEventListener('change', refreshAmount);
+                    batchSel.addEventListener('change', checkStatus);
                     feeTypeSel.addEventListener('change', refreshAmount);
                     planSel.addEventListener('change', refreshAmount);
-                    phoneEl.addEventListener('blur', refreshAmount);
+                    phoneEl.addEventListener('blur', checkStatus);
 
-                    // Pre-filled via a batch fee-info page link (?batch_id=&amp;fee_type=)
-                    if (batchSel.value &amp;&amp; feeTypeSel.value) {
+                    // Pre-filled via a batch fee-info page link (?batch_id=&amp;fee_type=&amp;phone=)
+                    if (batchSel.value &amp;&amp; phoneEl.value) {
+                        checkStatus();
+                    } else if (batchSel.value &amp;&amp; feeTypeSel.value) {
                         refreshAmount();
                     }
                 })();
@@ -221,22 +275,30 @@
                         </div>
                     </div>
 
-                    <div class="qp-fee-cards">
-                        <t t-foreach="fee_cards" t-as="c">
-                            <a t-attf-href="/quick-pay?batch_id=#{batch.id}&amp;fee_type=#{c['code']}"
-                               t-att-data-code="c['code']"
-                               t-attf-class="qp-fee-card js-qp-fee-card #{'qp-fee-card-highlight' if c['code'] == 'full_course' else ''}">
-                                <div class="qp-fee-card-label">
-                                    <t t-esc="c['label']"/>
-                                    <span t-if="c['code'] == 'full_course'" class="badge text-bg-primary ms-1">Pay Full Amount</span>
-                                    <span class="badge text-bg-success ms-1 js-qp-balance-badge" style="display:none;">Your Balance</span>
-                                </div>
-                                <div class="qp-fee-card-amount">
-                                    ₹ <span class="js-qp-fee-amount"><t t-esc="'{:,.2f}'.format(c['amount'])"/></span>
-                                </div>
-                                <div class="qp-fee-card-cta">Pay this →</div>
-                            </a>
-                        </t>
+                    <div id="qp_welcome_panel" class="qp-welcome-panel" style="display:none;">
+                        <div class="qp-welcome-emoji">🎉</div>
+                        <h2>You've Completed Full Payment!</h2>
+                        <p>Welcome to the <span id="qp_welcome_company">Otomater</span> Family.</p>
+                    </div>
+
+                    <div id="qp_fee_cards_wrap">
+                        <div class="qp-fee-cards">
+                            <t t-foreach="fee_cards" t-as="c">
+                                <a t-attf-href="/quick-pay?batch_id=#{batch.id}&amp;fee_type=#{c['code']}"
+                                   t-att-data-code="c['code']"
+                                   t-attf-class="qp-fee-card js-qp-fee-card #{'qp-fee-card-highlight' if c['code'] == 'full_course' else ''}">
+                                    <div class="qp-fee-card-label">
+                                        <t t-esc="c['label']"/>
+                                        <span t-if="c['code'] == 'full_course'" class="badge text-bg-primary ms-1">Pay Full Amount</span>
+                                        <span class="badge text-bg-success ms-1 js-qp-balance-badge" style="display:none;">Your Balance</span>
+                                    </div>
+                                    <div class="qp-fee-card-amount">
+                                        ₹ <span class="js-qp-fee-amount"><t t-esc="'{:,.2f}'.format(c['amount'])"/></span>
+                                    </div>
+                                    <div class="qp-fee-card-cta">Pay this →</div>
+                                </a>
+                            </t>
+                        </div>
                     </div>
 
                     <p class="text-muted text-center mt-4" style="font-size:12px;">
@@ -251,11 +313,22 @@
                 (function () {
                     var phoneEl = document.getElementById('qp_check_phone');
                     var btn = document.getElementById('qp_check_btn');
-                    var cards = document.querySelectorAll('.js-qp-fee-card');
                     var batchId = <t t-esc="batch.id"/>;
+                    var welcomePanel = document.getElementById('qp_welcome_panel');
+                    var welcomeCompany = document.getElementById('qp_welcome_company');
+                    var cardsWrap = document.getElementById('qp_fee_cards_wrap');
+
+                    function showAllCards() {
+                        cardsWrap.style.display = '';
+                        welcomePanel.style.display = 'none';
+                        document.querySelectorAll('.js-qp-fee-card').forEach(function (c) {
+                            c.style.display = '';
+                        });
+                    }
 
                     function checkBalance() {
                         var phone = phoneEl.value.trim();
+                        if (!phone) { showAllCards(); return; }
                         fetch('/quick-pay/batch_fee_amounts', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
@@ -265,7 +338,42 @@
                             })
                         }).then(function (r) { return r.json(); })
                           .then(function (data) {
-                            var fees = (data.result &amp;&amp; data.result.fees) || [];
+                            var result = data.result || {};
+
+                            if (result.status === 'fully_paid') {
+                                cardsWrap.style.display = 'none';
+                                welcomeCompany.textContent = result.company_name || 'Otomater';
+                                welcomePanel.style.display = '';
+                                return;
+                            }
+
+                            welcomePanel.style.display = 'none';
+                            cardsWrap.style.display = '';
+
+                            if (result.status === 'has_balance') {
+                                // Only the balance (Full Course Fee card) makes
+                                // sense once something's already been paid —
+                                // Admission/Reservation are already covered.
+                                document.querySelectorAll('.js-qp-fee-card').forEach(function (c) {
+                                    c.style.display = (c.getAttribute('data-code') === 'full_course') ? '' : 'none';
+                                });
+                                var card = document.querySelector('.js-qp-fee-card[data-code="full_course"]');
+                                if (card) {
+                                    card.querySelector('.js-qp-fee-amount').textContent = result.balance.toFixed(2);
+                                    card.href = '/quick-pay?batch_id=' + batchId + '&amp;fee_type=full_course' +
+                                        '&amp;phone=' + encodeURIComponent(phone);
+                                    var badge = card.querySelector('.js-qp-balance-badge');
+                                    badge.style.display = 'inline-block';
+                                }
+                                return;
+                            }
+
+                            // status === 'new' — show every configured fee at
+                            // its sticker price, nothing paid yet.
+                            var fees = result.fees || [];
+                            document.querySelectorAll('.js-qp-fee-card').forEach(function (c) {
+                                c.style.display = '';
+                            });
                             fees.forEach(function (f) {
                                 var card = document.querySelector('.js-qp-fee-card[data-code="' + f.code + '"]');
                                 if (!card) { return; }

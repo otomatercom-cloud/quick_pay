@@ -38,6 +38,27 @@
     padding: 14px 16px;
 }
 
+.qp-welcome-panel {
+    text-align: center;
+    background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 16px;
+    padding: 40px 24px;
+}
+.qp-welcome-emoji {
+    font-size: 48px;
+}
+.qp-welcome-panel h2 {
+    font-weight: 800;
+    color: #14532d;
+    margin: 10px 0 6px;
+}
+.qp-welcome-panel p {
+    color: #166534;
+    font-size: 16px;
+    margin: 0;
+}
+
 .qp-fee-cards {
     display: flex;
     flex-direction: column;

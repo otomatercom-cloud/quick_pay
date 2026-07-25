@@ -151,6 +151,24 @@ class QuickPay(models.Model):
         return lead.student_id.enrollment_ids.filtered(
             lambda e: e.batch_id == self.batch_id)[:1]
 
+    @api.model
+    def check_batch_payment_status(self, batch_id, phone):
+        """Used by both the batch fee-info page and the payment form once
+        a phone number is entered — tells the UI whether to show all fee
+        options (new), only the remaining balance (has_balance, hiding
+        Admission/Reservation since they're already covered by whatever
+        was paid before), or a completion message (fully_paid)."""
+        phone = (phone or '').strip()
+        if not phone or not batch_id:
+            return {'status': 'new'}
+        record = self.new({'batch_id': int(batch_id), 'phone': phone})
+        enrollment = record._find_existing_enrollment()
+        if not enrollment:
+            return {'status': 'new'}
+        if enrollment.due_amount <= 0:
+            return {'status': 'fully_paid'}
+        return {'status': 'has_balance', 'balance': enrollment.due_amount}
+
     def _resolve_fee_breakdown(self):
         """Returns {'inclusive', 'exclusive', 'gst', 'gst_rate'} resolved
         from the batch's fee.structure — never hardcoded, and computed the
