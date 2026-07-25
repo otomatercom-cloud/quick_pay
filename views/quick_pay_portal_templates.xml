@@ -27,7 +27,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Registered Mobile Number *</label>
-                                <input type="tel" name="phone" class="form-control"
+                                <input type="tel" name="phone" id="qp_phone" class="form-control"
                                        required="required"
                                        t-att-value="form_values.get('phone')"/>
                             </div>
@@ -76,9 +76,9 @@
                         </div>
 
                         <div class="mb-3 qp-amount-box">
-                            <label class="form-label">Amount to Pay</label>
+                            <label class="form-label" id="qp_amount_label">Amount to Pay</label>
                             <div class="qp-amount">₹ <span id="qp_amount">0.00</span></div>
-                            <div class="form-text">
+                            <div class="form-text" id="qp_amount_note">
                                 Transfer this amount via Bank/UPI, then upload your slip below.
                             </div>
                         </div>
@@ -106,9 +106,12 @@
                 (function () {
                     var batchSel = document.getElementById('qp_batch_id');
                     var feeTypeSel = document.getElementById('qp_fee_type');
+                    var phoneEl = document.getElementById('qp_phone');
                     var planWrap = document.getElementById('qp_plan_wrap');
                     var planSel = document.getElementById('qp_fee_structure_id');
                     var amountEl = document.getElementById('qp_amount');
+                    var amountLabelEl = document.getElementById('qp_amount_label');
+                    var amountNoteEl = document.getElementById('qp_amount_note');
 
                     function refreshAmount() {
                         var batchId = batchSel.value;
@@ -125,13 +128,24 @@
                                 jsonrpc: '2.0', method: 'call',
                                 params: {
                                     batch_id: batchId, fee_type: feeType,
-                                    fee_structure_id: planSel.value || null
+                                    fee_structure_id: planSel.value || null,
+                                    phone: phoneEl.value || null
                                 }
                             })
                         }).then(function (r) { return r.json(); })
                           .then(function (data) {
                             var result = data.result || {};
                             amountEl.textContent = (result.amount || 0).toFixed(2);
+                            if (result.is_balance) {
+                                amountLabelEl.textContent = 'Your Balance Due';
+                                amountNoteEl.textContent =
+                                    'This is your remaining balance for this batch, not the full course fee. ' +
+                                    'Transfer this amount via Bank/UPI, then upload your slip below.';
+                            } else {
+                                amountLabelEl.textContent = 'Amount to Pay';
+                                amountNoteEl.textContent =
+                                    'Transfer this amount via Bank/UPI, then upload your slip below.';
+                            }
                             if (feeType === 'full_course' &amp;&amp; result.plans &amp;&amp; result.plans.length > 1) {
                                 planWrap.style.display = 'block';
                                 planSel.innerHTML = '';
@@ -150,6 +164,7 @@
                     batchSel.addEventListener('change', refreshAmount);
                     feeTypeSel.addEventListener('change', refreshAmount);
                     planSel.addEventListener('change', refreshAmount);
+                    phoneEl.addEventListener('blur', refreshAmount);
                 })();
             </script>
         </t>

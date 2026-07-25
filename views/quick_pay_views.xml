@@ -147,6 +147,10 @@
                                    domain="[('id', 'in', available_fee_structure_ids)]"/>
                             <field name="available_fee_structure_ids" invisible="1"/>
                             <field name="fee_amount"/>
+                            <span class="text-warning" invisible="not is_balance_amount">
+                                <i class="fa fa-info-circle"/> Outstanding balance on an existing enrollment (not the full course price)
+                            </span>
+                            <field name="is_balance_amount" invisible="1"/>
                             <field name="transaction_number"/>
                             <field name="payment_slip" filename="payment_slip_filename"/>
                             <field name="payment_slip_filename" invisible="1"/>

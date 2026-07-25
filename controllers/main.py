@@ -27,24 +27,31 @@ class QuickPayPortal(http.Controller):
         })
 
     @http.route('/quick-pay/fee_amount', type='json', auth='public', website=True)
-    def quick_pay_fee_amount(self, batch_id=None, fee_type=None, fee_structure_id=None, **kw):
+    def quick_pay_fee_amount(self, batch_id=None, fee_type=None, fee_structure_id=None,
+                              phone=None, **kw):
         """Server-side amount lookup used to update the displayed amount
-        as the visitor picks a batch/fee type — informational only, the
-        real amount is always recomputed server-side again on submit."""
+        as the visitor picks a batch/fee type/phone — informational only,
+        the real amount is always recomputed server-side again on submit."""
         if not batch_id or not fee_type:
             return {'amount': 0.0}
         record = request.env['quick.pay'].sudo().new({
             'batch_id': int(batch_id),
             'fee_type': fee_type,
             'fee_structure_id': int(fee_structure_id) if fee_structure_id else False,
+            'phone': phone or False,
         })
+        breakdown = record._resolve_fee_breakdown()
         plans = []
-        if fee_type == 'full_course':
+        if fee_type == 'full_course' and not breakdown['is_balance']:
             plans = [
                 {'id': fs.id, 'name': fs.name}
                 for fs in record.available_fee_structure_ids
             ]
-        return {'amount': record._resolve_fee_amount(), 'plans': plans}
+        return {
+            'amount': breakdown['inclusive'],
+            'is_balance': breakdown['is_balance'],
+            'plans': plans,
+        }
 
     @http.route('/quick-pay/submit', type='http', auth='public', website=True,
                 methods=['POST'], csrf=True)

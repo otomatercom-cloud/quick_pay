@@ -97,6 +97,11 @@
                 <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_gst)"/></div>
                 <div class="o_fd_card_label">GST Payable</div>
             </div>
+            <div class="o_fd_card o_fd_card_balance">
+                <div class="o_fd_card_icon"><i class="fa fa-exclamation-triangle"/></div>
+                <div class="o_fd_card_value">₹ <t t-esc="fmt(summary.total_balance_due)"/></div>
+                <div class="o_fd_card_label">Outstanding Balance (all batches)</div>
+            </div>
         </div>
 
         <!-- ── Revenue breakdown (GST) ────────────────────────────── -->
@@ -150,12 +155,13 @@
                         <th class="text-end">Course ₹</th>
                         <th class="text-end">Total ₹</th>
                         <th class="text-end">GST ₹</th>
+                        <th class="text-end">Balance Due ₹</th>
                         <th class="text-end">Pending</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr t-if="!batches.length">
-                        <td colspan="7" class="text-center text-muted">No collections in this range.</td>
+                        <td colspan="8" class="text-center text-muted">No collections in this range.</td>
                     </tr>
                     <tr t-foreach="batches" t-as="b" t-key="b.batch_id"
                         style="cursor:pointer;" t-on-click="() => this.openBatchRequests(b)">
@@ -165,6 +171,10 @@
                         <td class="text-end" t-esc="fmt(b.full_course_total)"/>
                         <td class="text-end"><strong t-esc="fmt(b.total_collected)"/></td>
                         <td class="text-end" t-esc="fmt(b.gst_total)"/>
+                        <td class="text-end">
+                            <span t-if="b.balance_due" class="text-warning fw-bold" t-esc="fmt(b.balance_due)"/>
+                            <span t-else="">—</span>
+                        </td>
                         <td class="text-end">
                             <span t-if="b.pending_count" class="badge text-bg-warning" t-esc="b.pending_count"/>
                             <span t-else="">—</span>

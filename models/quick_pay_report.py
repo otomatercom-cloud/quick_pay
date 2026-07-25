@@ -107,6 +107,31 @@ class QuickPayReport(models.Model):
                 })
                 b['pending_count'] += 1
 
+        # ── outstanding balance due, per batch — a current snapshot from
+        # student.enrollment, not date-filtered (a balance owed doesn't
+        # belong to a particular day) ─────────────────────────────────────
+        Enrollment = self.env['student.enrollment'].sudo()
+        due_rows = Enrollment.search_read(
+            [('due_amount', '>', 0)], ['batch_id', 'due_amount'], limit=None)
+        total_balance_due = 0.0
+        for row in due_rows:
+            total_balance_due += row['due_amount'] or 0.0
+            if row['batch_id']:
+                bid = row['batch_id'][0]
+                bname = row['batch_id'][1]
+                b = batches.setdefault(bid, {
+                    'batch_id': bid, 'batch_name': bname,
+                    'total_collected': 0.0, 'admission_total': 0.0,
+                    'reservation_total': 0.0, 'full_course_total': 0.0,
+                    'gst_total': 0.0, 'count': 0, 'pending_count': 0,
+                    'balance_due': 0.0,
+                })
+                b.setdefault('balance_due', 0.0)
+                b['balance_due'] += row['due_amount'] or 0.0
+        for b in batches.values():
+            b.setdefault('balance_due', 0.0)
+        summary['total_balance_due'] = total_balance_due
+
         # ── day-wise breakdown (verified_date, one bucket per calendar day) ──
         days = {}
         cursor = d_from

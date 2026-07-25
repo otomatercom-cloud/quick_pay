@@ -68,6 +68,12 @@ class QuickPay(models.Model):
     gst_rate = fields.Char(
         string='GST Rate', compute='_compute_fee_amount', store=True, readonly=True,
     )
+    is_balance_amount = fields.Boolean(
+        string='Is Outstanding Balance', compute='_compute_fee_amount', store=True,
+        help="True when the Full Course Fee amount shown is the student's "
+             "actual remaining balance on an existing enrollment, rather "
+             "than the full course price.",
+    )
 
     payment_slip = fields.Binary(string='Payment Slip', attachment=True)
     payment_slip_filename = fields.Char()
@@ -130,12 +136,27 @@ class QuickPay(models.Model):
                 if rec.batch_id else self.env['fee.structure']
             )
 
+    def _find_existing_enrollment(self):
+        """The student's existing enrollment in the selected batch, if any
+        — used so 'Full Course Fee' shows the real outstanding balance
+        (e.g. after a reservation/admission fee or a previous instalment)
+        rather than the full sticker price every time."""
+        self.ensure_one()
+        if not self.phone or not self.batch_id:
+            return self.env['student.enrollment']
+        lead = self.env['leads.logic'].sudo().search(
+            [('phone_number', '=', self.phone)], limit=1)
+        if not lead or not lead.student_id:
+            return self.env['student.enrollment']
+        return lead.student_id.enrollment_ids.filtered(
+            lambda e: e.batch_id == self.batch_id)[:1]
+
     def _resolve_fee_breakdown(self):
         """Returns {'inclusive', 'exclusive', 'gst', 'gst_rate'} resolved
         from the batch's fee.structure — never hardcoded, and computed the
         same way for portal preview, the stored fields, and reporting."""
         self.ensure_one()
-        zero = {'inclusive': 0.0, 'exclusive': 0.0, 'gst': 0.0, 'gst_rate': '0'}
+        zero = {'inclusive': 0.0, 'exclusive': 0.0, 'gst': 0.0, 'gst_rate': '0', 'is_balance': False}
         if not self.batch_id or not self.fee_type:
             return zero
         if self.fee_type in ('reservation', 'admission'):
@@ -148,8 +169,23 @@ class QuickPay(models.Model):
             return {
                 'inclusive': incl, 'exclusive': excl,
                 'gst': round(incl - excl, 2), 'gst_rate': fs[:1].gst_rate,
+                'is_balance': False,
             }
-        # full_course
+        # full_course — prefer the real outstanding balance if the student
+        # already has an enrollment in this batch (part-paid or freshly
+        # admitted with dues still open); otherwise fall back to the full
+        # course fee for a brand-new admission.
+        enrollment = self._find_existing_enrollment()
+        if enrollment:
+            fs = enrollment.fee_structure_id
+            rate = float((fs.gst_rate if fs else enrollment.gst_rate) or 0)
+            incl = enrollment.due_amount
+            excl = round(incl / (1 + rate / 100), 2) if rate else incl
+            return {
+                'inclusive': incl, 'exclusive': excl,
+                'gst': round(incl - excl, 2), 'gst_rate': fs.gst_rate if fs else '0',
+                'is_balance': True,
+            }
         fs = self.fee_structure_id or self.available_fee_structure_ids[:1]
         if not fs:
             return zero
@@ -163,13 +199,14 @@ class QuickPay(models.Model):
         return {
             'inclusive': incl, 'exclusive': excl,
             'gst': round(incl - excl, 2), 'gst_rate': fs.gst_rate,
+            'is_balance': False,
         }
 
     def _resolve_fee_amount(self):
         self.ensure_one()
         return self._resolve_fee_breakdown()['inclusive']
 
-    @api.depends('batch_id', 'fee_type', 'fee_structure_id')
+    @api.depends('batch_id', 'fee_type', 'fee_structure_id', 'phone')
     def _compute_fee_amount(self):
         for rec in self:
             breakdown = rec._resolve_fee_breakdown()
@@ -177,6 +214,7 @@ class QuickPay(models.Model):
             rec.base_amount = breakdown['exclusive']
             rec.gst_amount = breakdown['gst']
             rec.gst_rate = breakdown['gst_rate']
+            rec.is_balance_amount = breakdown['is_balance']
 
     @api.onchange('batch_id', 'fee_type', 'fee_structure_id')
     def _onchange_fee_inputs(self):
