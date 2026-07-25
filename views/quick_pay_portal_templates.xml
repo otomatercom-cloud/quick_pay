@@ -210,15 +210,30 @@
                         contact us directly.
                     </div>
 
+                    <div class="qp-balance-check mb-4">
+                        <label class="form-label" style="font-size:13px;">
+                            Already paid something towards this batch? Enter your
+                            registered mobile number to see your real remaining balance.
+                        </label>
+                        <div class="d-flex gap-2">
+                            <input type="tel" id="qp_check_phone" class="form-control" placeholder="Registered mobile number"/>
+                            <button type="button" id="qp_check_btn" class="btn btn-primary">Check My Balance</button>
+                        </div>
+                    </div>
+
                     <div class="qp-fee-cards">
                         <t t-foreach="fee_cards" t-as="c">
                             <a t-attf-href="/quick-pay?batch_id=#{batch.id}&amp;fee_type=#{c['code']}"
-                               t-attf-class="qp-fee-card #{'qp-fee-card-highlight' if c['code'] == 'full_course' else ''}">
+                               t-att-data-code="c['code']"
+                               t-attf-class="qp-fee-card js-qp-fee-card #{'qp-fee-card-highlight' if c['code'] == 'full_course' else ''}">
                                 <div class="qp-fee-card-label">
                                     <t t-esc="c['label']"/>
                                     <span t-if="c['code'] == 'full_course'" class="badge text-bg-primary ms-1">Pay Full Amount</span>
+                                    <span class="badge text-bg-success ms-1 js-qp-balance-badge" style="display:none;">Your Balance</span>
                                 </div>
-                                <div class="qp-fee-card-amount">₹ <t t-esc="'{:,.2f}'.format(c['amount'])"/></div>
+                                <div class="qp-fee-card-amount">
+                                    ₹ <span class="js-qp-fee-amount"><t t-esc="'{:,.2f}'.format(c['amount'])"/></span>
+                                </div>
                                 <div class="qp-fee-card-cta">Pay this →</div>
                             </a>
                         </t>
@@ -226,11 +241,49 @@
 
                     <p class="text-muted text-center mt-4" style="font-size:12px;">
                         Already paid something towards this batch? Enter your
-                        registered mobile number on the payment page and we'll
-                        show your actual remaining balance instead.
+                        registered mobile number above and we'll show your
+                        actual remaining balance before you pay.
                     </p>
                 </div>
             </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var phoneEl = document.getElementById('qp_check_phone');
+                    var btn = document.getElementById('qp_check_btn');
+                    var cards = document.querySelectorAll('.js-qp-fee-card');
+                    var batchId = <t t-esc="batch.id"/>;
+
+                    function checkBalance() {
+                        var phone = phoneEl.value.trim();
+                        fetch('/quick-pay/batch_fee_amounts', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                jsonrpc: '2.0', method: 'call',
+                                params: {batch_id: batchId, phone: phone}
+                            })
+                        }).then(function (r) { return r.json(); })
+                          .then(function (data) {
+                            var fees = (data.result &amp;&amp; data.result.fees) || [];
+                            fees.forEach(function (f) {
+                                var card = document.querySelector('.js-qp-fee-card[data-code="' + f.code + '"]');
+                                if (!card) { return; }
+                                card.querySelector('.js-qp-fee-amount').textContent = f.amount.toFixed(2);
+                                card.href = '/quick-pay?batch_id=' + batchId + '&amp;fee_type=' + f.code +
+                                    (phone ? '&amp;phone=' + encodeURIComponent(phone) : '');
+                                var badge = card.querySelector('.js-qp-balance-badge');
+                                badge.style.display = f.is_balance ? 'inline-block' : 'none';
+                            });
+                        });
+                    }
+
+                    btn.addEventListener('click', checkBalance);
+                    phoneEl.addEventListener('keydown', function (ev) {
+                        if (ev.key === 'Enter') { ev.preventDefault(); checkBalance(); }
+                    });
+                })();
+            </script>
         </t>
     </template>
 

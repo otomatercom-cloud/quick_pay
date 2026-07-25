@@ -336,6 +336,7 @@ class QuickPay(models.Model):
             'email_address': self.email or False,
             'place': self.place or False,
             'batch_preference': self.batch_id.name,
+            'state': 'new',
         })
 
     def _resolve_admission_fee_structure(self):

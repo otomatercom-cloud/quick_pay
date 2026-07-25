@@ -17,13 +17,15 @@ FEE_TYPES = [
 class QuickPayPortal(http.Controller):
 
     @http.route('/quick-pay', type='http', auth='public', website=True, sitemap=True)
-    def quick_pay_form(self, batch_id=None, fee_type=None, **kw):
+    def quick_pay_form(self, batch_id=None, fee_type=None, phone=None, **kw):
         batches = request.env['student.batch'].sudo().search([('active', '=', True)])
         form_values = {}
         if batch_id:
             form_values['batch_id'] = batch_id
         if fee_type in dict(FEE_TYPES):
             form_values['fee_type'] = fee_type
+        if phone:
+            form_values['phone'] = phone
         return request.render('quick_pay.portal_quick_pay_form', {
             'batches': batches,
             'fee_types': FEE_TYPES,
@@ -145,9 +147,8 @@ class QuickPayPortal(http.Controller):
                     'amount': breakdown['inclusive'],
                 })
 
-        # "Pay the full amount" — the course's own total, which already
-        # includes the admission fee as a first instalment towards it
-        # (not stacked on top of it) — same math the payment form uses.
+        # "Pay the full amount" — course fee + admission fee added
+        # together (see quick.pay._resolve_fee_breakdown).
         full_course = next((c for c in fee_cards if c['code'] == 'full_course'), None)
 
         return request.render('quick_pay.portal_batch_fee_info', {
@@ -155,4 +156,26 @@ class QuickPayPortal(http.Controller):
             'fee_cards': fee_cards,
             'full_course': full_course,
         })
+
+    @http.route('/quick-pay/batch_fee_amounts', type='json', auth='public', website=True)
+    def quick_pay_batch_fee_amounts(self, batch_id=None, phone=None, **kw):
+        """Used by the batch fee-info page's 'Check My Balance' box —
+        returns every fee type's amount for this batch, personalized to
+        the phone number if it matches an existing student, without
+        making the visitor go to the payment form first."""
+        if not batch_id:
+            return {'fees': []}
+        fees = []
+        for code, label in FEE_TYPES:
+            record = request.env['quick.pay'].sudo().new({
+                'batch_id': int(batch_id), 'fee_type': code, 'phone': phone or False,
+            })
+            breakdown = record._resolve_fee_breakdown()
+            if breakdown['inclusive'] > 0:
+                fees.append({
+                    'code': code, 'label': label,
+                    'amount': breakdown['inclusive'],
+                    'is_balance': breakdown['is_balance'],
+                })
+        return {'fees': fees}
 
