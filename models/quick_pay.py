@@ -1,0 +1,309 @@
+import logging
+
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
+
+FEE_TYPE_SELECTION = [
+    ('reservation', 'Batch Reservation Fee'),
+    ('admission', 'Admission Fee'),
+    ('full_course', 'Full Course Fee'),
+]
+
+STATE_SELECTION = [
+    ('draft', 'Draft'),
+    ('submitted', 'Submitted'),
+    ('verified', 'Verified'),
+    ('rejected', 'Rejected'),
+    ('converted', 'Converted'),
+    ('cancelled', 'Cancelled'),
+]
+
+QUICK_PAY_SOURCE_XMLID = 'quick_pay.leads_source_quick_pay'
+
+
+class QuickPay(models.Model):
+    _name = 'quick.pay'
+    _description = 'Quick Pay - Pre-Admission Payment Request'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'id desc'
+    _rec_name = 'name'
+
+    name = fields.Char(string='Reference', default='New', readonly=True, copy=False)
+
+    student_name = fields.Char(required=True, tracking=True)
+    phone = fields.Char(string='Registered Mobile Number', required=True, tracking=True)
+    place = fields.Char()
+    email = fields.Char()
+
+    batch_id = fields.Many2one(
+        'student.batch', string='Batch', required=True,
+        domain=[('active', '=', True)], tracking=True,
+    )
+    fee_type = fields.Selection(FEE_TYPE_SELECTION, required=True, tracking=True)
+
+    available_fee_structure_ids = fields.Many2many(
+        'fee.structure', compute='_compute_available_fee_structures',
+        string='Available Course Fee Plans',
+    )
+    fee_structure_id = fields.Many2one(
+        'fee.structure', string='Course Fee Plan',
+        domain="[('id', 'in', available_fee_structure_ids)]",
+        help="Only relevant for Full Course Fee, if the batch has more "
+             "than one plan (e.g. lump sum vs installment).",
+    )
+    fee_amount = fields.Float(
+        string='Fee Amount ₹', digits=(10, 2),
+        compute='_compute_fee_amount', store=True, readonly=True,
+    )
+
+    payment_slip = fields.Binary(string='Payment Slip', attachment=True)
+    payment_slip_filename = fields.Char()
+    transaction_number = fields.Char(string='Transaction Number')
+    remarks = fields.Text()
+
+    submission_date = fields.Datetime(default=fields.Datetime.now, readonly=True)
+    verified_date = fields.Datetime(readonly=True, copy=False)
+    verified_by = fields.Many2one('res.users', readonly=True, copy=False)
+    reject_reason = fields.Text(readonly=True, copy=False)
+
+    state = fields.Selection(
+        STATE_SELECTION, default='draft', required=True,
+        tracking=True, copy=False,
+    )
+
+    lead_id = fields.Many2one('leads.logic', readonly=True, copy=False)
+    student_id = fields.Many2one('student.details', readonly=True, copy=False)
+    enrollment_id = fields.Many2one('student.enrollment', readonly=True, copy=False)
+    payment_id = fields.Many2one('student.fee.payment', readonly=True, copy=False)
+
+    # ── computed fee resolution (never hardcoded) ───────────────────────
+    @api.depends('batch_id')
+    def _compute_available_fee_structures(self):
+        for rec in self:
+            rec.available_fee_structure_ids = (
+                rec.batch_id.fee_structure_ids.filtered(
+                    lambda f: f.fee_type in ('lumpsum', 'installment'))
+                if rec.batch_id else self.env['fee.structure']
+            )
+
+    def _resolve_fee_amount(self):
+        self.ensure_one()
+        if not self.batch_id or not self.fee_type:
+            return 0.0
+        if self.fee_type in ('reservation', 'admission'):
+            fs = self.batch_id.fee_structure_ids.filtered(
+                lambda f: f.fee_type == self.fee_type)[:1]
+            return sum(fs.mapped('amount_inclusive'))
+        # full_course
+        fs = self.fee_structure_id or self.available_fee_structure_ids[:1]
+        if not fs:
+            return 0.0
+        return fs.total_fee_amount if fs.fee_type == 'installment' else fs.amount_inclusive
+
+    @api.depends('batch_id', 'fee_type', 'fee_structure_id')
+    def _compute_fee_amount(self):
+        for rec in self:
+            rec.fee_amount = rec._resolve_fee_amount()
+
+    @api.onchange('batch_id', 'fee_type', 'fee_structure_id')
+    def _onchange_fee_inputs(self):
+        self.fee_structure_id = False if self.fee_type != 'full_course' else self.fee_structure_id
+        self.fee_amount = self._resolve_fee_amount()
+
+    # ── validations ──────────────────────────────────────────────────────
+    @api.constrains('fee_amount', 'state')
+    def _check_fee_amount(self):
+        for rec in self:
+            if rec.state != 'draft' and rec.fee_amount <= 0:
+                raise ValidationError(_(
+                    "No fee amount is configured for '%s' on batch %s. "
+                    "Set it up in the batch's fee structures first."
+                ) % (dict(FEE_TYPE_SELECTION).get(rec.fee_type), rec.batch_id.name))
+
+    @api.constrains('phone', 'batch_id', 'fee_type', 'state')
+    def _check_duplicate_pending(self):
+        for rec in self:
+            if rec.state != 'submitted' or not rec.phone or not rec.batch_id:
+                continue
+            dup = self.search([
+                ('id', '!=', rec.id),
+                ('phone', '=', rec.phone),
+                ('batch_id', '=', rec.batch_id.id),
+                ('fee_type', '=', rec.fee_type),
+                ('state', '=', 'submitted'),
+            ], limit=1)
+            if dup:
+                raise ValidationError(_(
+                    "A pending payment request already exists for this "
+                    "student, batch and fee type (%s)."
+                ) % dup.name)
+
+    # ── create ───────────────────────────────────────────────────────────
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', 'New') == 'New':
+                vals['name'] = self.env['ir.sequence'].next_by_code('quick.pay') or 'New'
+            vals.setdefault('state', 'submitted')
+        records = super().create(vals_list)
+        for rec in records:
+            rec.message_post(body=_(
+                "Payment request submitted: ₹%(amount)s for %(fee_type)s."
+            ) % {
+                'amount': f"{rec.fee_amount:,.2f}",
+                'fee_type': dict(FEE_TYPE_SELECTION).get(rec.fee_type),
+            })
+        return records
+
+    # ── verify / reject / cancel ────────────────────────────────────────
+    def action_verify(self):
+        for rec in self:
+            if rec.state != 'submitted':
+                raise UserError(_("Only submitted requests can be verified."))
+            rec._do_verify()
+
+    def action_open_reject_wizard(self):
+        self.ensure_one()
+        if self.state != 'submitted':
+            raise UserError(_("Only submitted requests can be rejected."))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Reject Payment Request'),
+            'res_model': 'quick.pay.reject.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_quick_pay_id': self.id},
+        }
+
+    def action_cancel(self):
+        for rec in self:
+            if rec.state == 'converted':
+                raise UserError(_("A converted request cannot be cancelled."))
+            rec.state = 'cancelled'
+            rec.message_post(body=_("Payment request cancelled."))
+
+    # ── the automated admission flow ────────────────────────────────────
+    def _get_or_create_quick_pay_source(self):
+        source = self.env.ref(QUICK_PAY_SOURCE_XMLID, raise_if_not_found=False)
+        if source:
+            return source
+        return self.env['leads.sources'].search(
+            [('name', '=', 'Quick Pay')], limit=1
+        ) or self.env['leads.sources'].create({'name': 'Quick Pay'})
+
+    def _find_or_create_lead(self):
+        self.ensure_one()
+        Lead = self.env['leads.logic']
+        lead = Lead.search([('phone_number', '=', self.phone)], limit=1)
+        if lead:
+            return lead
+        return Lead.create({
+            'leads_source': self._get_or_create_quick_pay_source().id,
+            'name': self.student_name,
+            'phone_number': self.phone,
+            'email_address': self.email or False,
+            'place': self.place or False,
+            'batch_preference': self.batch_id.name,
+        })
+
+    def _resolve_admission_fee_structure(self):
+        """The fee.structure used to actually create the enrollment — this
+        is always the batch's main course plan, regardless of which fee
+        type the student paid via Quick Pay (reservation/admission/full),
+        since all three are just different entry points into the same
+        admission."""
+        self.ensure_one()
+        if self.fee_type == 'full_course' and self.fee_structure_id:
+            return self.fee_structure_id
+        return self.batch_id.fee_structure_ids.filtered(
+            lambda f: f.fee_type in ('lumpsum', 'installment'))[:1]
+
+    def _do_verify(self):
+        self.ensure_one()
+        lead = self._find_or_create_lead()
+        course_fs = self._resolve_admission_fee_structure()
+        if not course_fs:
+            raise UserError(_(
+                "No course fee structure (lump sum/installment) is "
+                "configured for batch '%s'. Set one up before verifying."
+            ) % self.batch_id.name)
+
+        if lead.student_profile_created or lead.student_id:
+            student = lead.student_id
+        else:
+            # Reuse custom_leads_19's own field-mapping logic
+            # (LeadAdmissionWizard._prepare_student_vals) via an unsaved
+            # wizard instance, then replicate its "full mode" admission
+            # exactly as action_confirm_admission does — done inline
+            # rather than calling that method directly because it branches
+            # on an ir.config_parameter ('admission_batch_required') that
+            # Quick Pay must not depend on: Quick Pay always has a batch
+            # and a fee plan resolved, so it always wants full admission.
+            wiz = self.env['lead.admission.wizard'].new({
+                'lead_id': lead.id,
+                'batch_id': self.batch_id.id,
+                'fee_structure_id': course_fs.id,
+            })
+            student = self.env['student.details'].create(wiz._prepare_student_vals())
+
+            total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
+                else course_fs.amount_inclusive
+            admission_fs = self.batch_id.fee_structure_ids.filtered(
+                lambda f: f.fee_type == 'admission')
+            grand_total = total + sum(admission_fs.mapped('amount_inclusive'))
+
+            self.env['student.enrollment'].create({
+                'student_id': student.id,
+                'batch_id': self.batch_id.id,
+                'fee_structure_id': course_fs.id,
+                'total_fee': grand_total,
+                'fee_type': course_fs.fee_type,
+                'gst_rate': course_fs.gst_rate,
+            })
+
+            lead.write({
+                'student_id': student.id,
+                'adm_id': student.id,
+                'student_profile_created': True,
+                'admission_status': True,
+                'admission_date': fields.Datetime.now(),
+                'lead_quality': 'admission',
+                'state': 'qualified',
+                'current_status': 'admission',
+                'admission_batch': self.batch_id.name,
+                'student_name': student.name,
+            })
+            lead.message_post(body=_(
+                "Student admission completed via Quick Pay (%s)."
+            ) % self.name)
+
+        enrollment = student.enrollment_ids.filtered(
+            lambda e: e.batch_id == self.batch_id)[:1] or student.enrollment_ids[:1]
+
+        payment = False
+        if self.fee_amount > 0 and enrollment:
+            payment = self.env['student.fee.payment'].create({
+                'enrollment_id': enrollment.id,
+                'amount': self.fee_amount,
+                'payment_mode': 'upi',
+                'receipt_no': self.transaction_number or self.name,
+                'remarks': _("Quick Pay (%(type)s) - Ref %(ref)s") % {
+                    'type': dict(FEE_TYPE_SELECTION).get(self.fee_type),
+                    'ref': self.name,
+                },
+            })
+
+        self.write({
+            'state': 'converted',
+            'lead_id': lead.id,
+            'student_id': student.id,
+            'enrollment_id': enrollment.id if enrollment else False,
+            'payment_id': payment.id if payment else False,
+            'verified_date': fields.Datetime.now(),
+            'verified_by': self.env.user.id,
+        })
+        self.message_post(body=_(
+            "Payment verified. Admission completed for %(name)s (Reg. No: %(reg)s)."
+        ) % {'name': student.name, 'reg': student.registration_no})

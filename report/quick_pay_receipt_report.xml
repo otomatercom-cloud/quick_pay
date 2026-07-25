@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_report_quick_pay_receipt" model="ir.actions.report">
+        <field name="name">Quick Pay Receipt</field>
+        <field name="model">quick.pay</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">quick_pay.report_quick_pay_receipt_document</field>
+        <field name="report_file">quick_pay.report_quick_pay_receipt_document</field>
+        <field name="print_report_name">'Receipt - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_quick_pay"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_quick_pay_receipt_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Payment Receipt</h2>
+                        <table class="table table-sm" style="width:100%;">
+                            <tr>
+                                <td><strong>Reference</strong></td>
+                                <td><span t-field="o.name"/></td>
+                                <td><strong>Date</strong></td>
+                                <td><span t-field="o.submission_date"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Student</strong></td>
+                                <td><span t-field="o.student_name"/></td>
+                                <td><strong>Phone</strong></td>
+                                <td><span t-field="o.phone"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Batch</strong></td>
+                                <td><span t-field="o.batch_id.name"/></td>
+                                <td><strong>Fee Type</strong></td>
+                                <td><span t-field="o.fee_type"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Transaction No.</strong></td>
+                                <td><span t-field="o.transaction_number"/></td>
+                                <td><strong>Status</strong></td>
+                                <td><span t-field="o.state"/></td>
+                            </tr>
+                        </table>
+                        <table class="table table-bordered mt-3" style="width:100%;">
+                            <tr>
+                                <th>Description</th>
+                                <th style="text-align:right;">Amount ₹</th>
+                            </tr>
+                            <tr>
+                                <td><span t-field="o.fee_type"/></td>
+                                <td style="text-align:right;">
+                                    <span t-field="o.fee_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                </td>
+                            </tr>
+                        </table>
+                        <p t-if="o.verified_by" class="mt-4 text-muted">
+                            Verified by <span t-field="o.verified_by.name"/>
+                            on <span t-field="o.verified_date"/>.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

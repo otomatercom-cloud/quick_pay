@@ -1,0 +1,24 @@
+.quick-pay-wrap {
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 220px);
+}
+
+.quick-pay-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.qp-amount-box {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.qp-amount {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0369a1;
+}

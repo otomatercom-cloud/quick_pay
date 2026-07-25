@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="portal_quick_pay_form" name="Quick Pay">
+        <t t-call="website.layout">
+            <div id="wrap" class="quick-pay-wrap">
+                <div class="container py-5" style="max-width:640px;">
+                    <div class="text-center mb-4">
+                        <h1 class="fw-bold">Quick Pay</h1>
+                        <p class="text-muted">
+                            Reserve your seat, pay your admission fee, or pay the full
+                            course fee — before your admission is completed.
+                        </p>
+                    </div>
+
+                    <div t-if="error" class="alert alert-danger" t-esc="error"/>
+
+                    <form action="/quick-pay/submit" method="post"
+                          enctype="multipart/form-data" class="quick-pay-card">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div class="mb-3">
+                            <label class="form-label">Student Name *</label>
+                            <input type="text" name="student_name" class="form-control"
+                                   required="required"
+                                   t-att-value="form_values.get('student_name')"/>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Registered Mobile Number *</label>
+                                <input type="tel" name="phone" class="form-control"
+                                       required="required"
+                                       t-att-value="form_values.get('phone')"/>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Place</label>
+                                <input type="text" name="place" class="form-control"
+                                       t-att-value="form_values.get('place')"/>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email (optional)</label>
+                            <input type="email" name="email" class="form-control"
+                                   t-att-value="form_values.get('email')"/>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Select Batch *</label>
+                                <select name="batch_id" id="qp_batch_id" class="form-select" required="required">
+                                    <option value="">-- Select Batch --</option>
+                                    <t t-foreach="batches" t-as="b">
+                                        <option t-att-value="b.id"
+                                                t-att-selected="'selected' if str(b.id) == str(form_values.get('batch_id')) else None">
+                                            <t t-esc="b.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Fee Type *</label>
+                                <select name="fee_type" id="qp_fee_type" class="form-select" required="required">
+                                    <option value="">-- Select Fee Type --</option>
+                                    <t t-foreach="fee_types" t-as="ft">
+                                        <option t-att-value="ft[0]"
+                                                t-att-selected="'selected' if ft[0] == form_values.get('fee_type') else None">
+                                            <t t-esc="ft[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="qp_plan_wrap" style="display:none;">
+                            <label class="form-label">Course Fee Plan</label>
+                            <select name="fee_structure_id" id="qp_fee_structure_id" class="form-select"/>
+                        </div>
+
+                        <div class="mb-3 qp-amount-box">
+                            <label class="form-label">Amount to Pay</label>
+                            <div class="qp-amount">₹ <span id="qp_amount">0.00</span></div>
+                            <div class="form-text">
+                                Transfer this amount via Bank/UPI, then upload your slip below.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Transaction Number (optional)</label>
+                            <input type="text" name="transaction_number" class="form-control"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Payment Slip *</label>
+                            <input type="file" name="payment_slip" class="form-control"
+                                   accept="image/*,application/pdf" required="required"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Remarks</label>
+                            <textarea name="remarks" class="form-control" rows="2"/>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2">Submit</button>
+                    </form>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var batchSel = document.getElementById('qp_batch_id');
+                    var feeTypeSel = document.getElementById('qp_fee_type');
+                    var planWrap = document.getElementById('qp_plan_wrap');
+                    var planSel = document.getElementById('qp_fee_structure_id');
+                    var amountEl = document.getElementById('qp_amount');
+
+                    function refreshAmount() {
+                        var batchId = batchSel.value;
+                        var feeType = feeTypeSel.value;
+                        if (!batchId || !feeType) {
+                            amountEl.textContent = '0.00';
+                            planWrap.style.display = 'none';
+                            return;
+                        }
+                        fetch('/quick-pay/fee_amount', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                jsonrpc: '2.0', method: 'call',
+                                params: {
+                                    batch_id: batchId, fee_type: feeType,
+                                    fee_structure_id: planSel.value || null
+                                }
+                            })
+                        }).then(function (r) { return r.json(); })
+                          .then(function (data) {
+                            var result = data.result || {};
+                            amountEl.textContent = (result.amount || 0).toFixed(2);
+                            if (feeType === 'full_course' &amp;&amp; result.plans &amp;&amp; result.plans.length > 1) {
+                                planWrap.style.display = 'block';
+                                planSel.innerHTML = '';
+                                result.plans.forEach(function (p) {
+                                    var opt = document.createElement('option');
+                                    opt.value = p.id;
+                                    opt.textContent = p.name;
+                                    planSel.appendChild(opt);
+                                });
+                            } else {
+                                planWrap.style.display = 'none';
+                            }
+                        });
+                    }
+
+                    batchSel.addEventListener('change', refreshAmount);
+                    feeTypeSel.addEventListener('change', refreshAmount);
+                    planSel.addEventListener('change', refreshAmount);
+                })();
+            </script>
+        </t>
+    </template>
+
+    <template id="portal_quick_pay_thank_you" name="Quick Pay - Thank You">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="container py-5 text-center" style="max-width:560px;">
+                    <div style="font-size:48px;">✅</div>
+                    <h1 class="fw-bold">Payment Request Submitted</h1>
+                    <p class="text-muted">
+                        Your reference number is
+                        <strong><t t-esc="ref"/></strong>.
+                        Our Accounts team will verify your payment shortly.
+                    </p>
+                    <a href="/quick-pay" class="btn btn-outline-primary mt-3">Submit Another</a>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

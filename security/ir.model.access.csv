@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_quick_pay_user,quick.pay.user,model_quick_pay,group_quick_pay_user,1,0,0,0
+access_quick_pay_accounts,quick.pay.accounts,model_quick_pay,group_quick_pay_accounts,1,1,1,0
+access_quick_pay_manager,quick.pay.manager,model_quick_pay,group_quick_pay_manager,1,1,1,1
+access_quick_pay_reject_wizard,quick.pay.reject.wizard,model_quick_pay_reject_wizard,group_quick_pay_accounts,1,1,1,1

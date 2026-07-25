@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <record id="seq_quick_pay" model="ir.sequence">
+        <field name="name">Quick Pay Reference</field>
+        <field name="code">quick.pay</field>
+        <field name="prefix">QP</field>
+        <field name="padding">6</field>
+        <field name="number_increment">1</field>
+    </record>
+</odoo>

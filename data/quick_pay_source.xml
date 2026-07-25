@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <record id="leads_source_quick_pay" model="leads.sources">
+        <field name="name">Quick Pay</field>
+        <field name="source">inbound_source</field>
+        <field name="digital_lead">True</field>
+    </record>
+</odoo>

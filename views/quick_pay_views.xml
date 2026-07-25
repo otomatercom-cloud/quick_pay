@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- ── Search ─────────────────────────────────────────────────────────── -->
+    <record id="view_quick_pay_search" model="ir.ui.view">
+        <field name="name">quick.pay.search</field>
+        <field name="model">quick.pay</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Reference"/>
+                <field name="student_name" string="Student"/>
+                <field name="phone" string="Phone"/>
+                <field name="batch_id"/>
+                <field name="fee_type"/>
+                <filter name="filter_pending" string="Pending" domain="[('state', '=', 'submitted')]"/>
+                <filter name="filter_verified" string="Converted" domain="[('state', '=', 'converted')]"/>
+                <filter name="filter_rejected" string="Rejected" domain="[('state', '=', 'rejected')]"/>
+                <filter name="filter_today" string="Today"
+                        domain="[('submission_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('submission_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <separator/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="group_batch" string="Batch" context="{'group_by': 'batch_id'}"/>
+                <filter name="group_fee_type" string="Fee Type" context="{'group_by': 'fee_type'}"/>
+                <filter name="group_date" string="Submission Date" context="{'group_by': 'submission_date:day'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── List ───────────────────────────────────────────────────────────── -->
+    <record id="view_quick_pay_list" model="ir.ui.view">
+        <field name="name">quick.pay.list</field>
+        <field name="model">quick.pay</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'converted'"
+                  decoration-info="state == 'submitted'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="submission_date"/>
+                <field name="student_name"/>
+                <field name="phone"/>
+                <field name="batch_id"/>
+                <field name="fee_type" widget="badge"/>
+                <field name="fee_amount" string="Amount ₹" sum="Total ₹"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'converted'"
+                       decoration-info="state == 'submitted'"
+                       decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Kanban ─────────────────────────────────────────────────────────── -->
+    <record id="view_quick_pay_kanban" model="ir.ui.view">
+        <field name="name">quick.pay.kanban</field>
+        <field name="model">quick.pay</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="student_name"/>
+                <field name="phone"/>
+                <field name="batch_id"/>
+                <field name="fee_type"/>
+                <field name="fee_amount"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card oe_kanban_global_click p-2">
+                            <div style="font-weight:700;">
+                                <field name="name"/> — <field name="student_name"/>
+                            </div>
+                            <div style="color:#64748b;font-size:12px;">
+                                <field name="batch_id"/> · <field name="phone"/>
+                            </div>
+                            <div class="mt-1">
+                                <span class="badge rounded-pill text-bg-light">
+                                    <field name="fee_type"/>
+                                </span>
+                                <span style="float:right;font-weight:700;">
+                                    ₹ <field name="fee_amount"/>
+                                </span>
+                            </div>
+                            <div class="mt-2" invisible="state != 'submitted'">
+                                <button name="action_verify" type="object"
+                                        class="btn btn-sm btn-success" string="✓ Verify"/>
+                                <button name="action_open_reject_wizard" type="object"
+                                        class="btn btn-sm btn-outline-danger" string="✕ Reject"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ── Form ───────────────────────────────────────────────────────────── -->
+    <record id="view_quick_pay_form" model="ir.ui.view">
+        <field name="name">quick.pay.form</field>
+        <field name="model">quick.pay</field>
+        <field name="arch" type="xml">
+            <form string="Quick Pay Request">
+                <header>
+                    <button name="action_verify" type="object"
+                            string="✓ Verify Payment" class="btn-primary"
+                            invisible="state != 'submitted'"
+                            groups="quick_pay.group_quick_pay_accounts"/>
+                    <button name="action_open_reject_wizard" type="object"
+                            string="✕ Reject" class="btn-secondary"
+                            invisible="state != 'submitted'"
+                            groups="quick_pay.group_quick_pay_accounts"/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel Request" class="btn-secondary"
+                            invisible="state in ('converted', 'cancelled')"
+                            groups="quick_pay.group_quick_pay_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="submitted,verified,converted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Student">
+                            <field name="student_name"/>
+                            <field name="phone"/>
+                            <field name="place"/>
+                            <field name="email"/>
+                        </group>
+                        <group string="Payment">
+                            <field name="batch_id"/>
+                            <field name="fee_type"/>
+                            <field name="fee_structure_id"
+                                   invisible="fee_type != 'full_course'"
+                                   domain="[('id', 'in', available_fee_structure_ids)]"/>
+                            <field name="available_fee_structure_ids" invisible="1"/>
+                            <field name="fee_amount"/>
+                            <field name="transaction_number"/>
+                            <field name="payment_slip" filename="payment_slip_filename"/>
+                            <field name="payment_slip_filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Verification" invisible="state not in ('rejected', 'converted')">
+                        <field name="verified_date" readonly="1"/>
+                        <field name="verified_by" readonly="1"/>
+                        <field name="reject_reason" readonly="1" invisible="state != 'rejected'"/>
+                        <field name="lead_id" readonly="1" invisible="not lead_id"/>
+                        <field name="student_id" readonly="1" invisible="not student_id"/>
+                        <field name="enrollment_id" readonly="1" invisible="not enrollment_id"/>
+                    </group>
+                    <group>
+                        <field name="remarks"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Actions ────────────────────────────────────────────────────────── -->
+    <record id="action_quick_pay_all" model="ir.actions.act_window">
+        <field name="name">All Payments</field>
+        <field name="res_model">quick.pay</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_quick_pay_search"/>
+    </record>
+
+    <record id="action_quick_pay_pending" model="ir.actions.act_window">
+        <field name="name">Pending Payments</field>
+        <field name="res_model">quick.pay</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('state', '=', 'submitted')]</field>
+        <field name="search_view_id" ref="view_quick_pay_search"/>
+    </record>
+
+    <record id="action_quick_pay_verified" model="ir.actions.act_window">
+        <field name="name">Verified</field>
+        <field name="res_model">quick.pay</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '=', 'converted')]</field>
+        <field name="search_view_id" ref="view_quick_pay_search"/>
+    </record>
+
+    <record id="action_quick_pay_rejected" model="ir.actions.act_window">
+        <field name="name">Rejected</field>
+        <field name="res_model">quick.pay</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '=', 'rejected')]</field>
+        <field name="search_view_id" ref="view_quick_pay_search"/>
+    </record>
+
+    <!-- ── Menu ───────────────────────────────────────────────────────────── -->
+    <menuitem id="menu_quick_pay_root" name="Quick Pay" sequence="20"
+              groups="quick_pay.group_quick_pay_user"/>
+    <menuitem id="menu_quick_pay_pending" name="Pending Payments"
+              parent="menu_quick_pay_root" action="action_quick_pay_pending" sequence="10"/>
+    <menuitem id="menu_quick_pay_verified" name="Verified"
+              parent="menu_quick_pay_root" action="action_quick_pay_verified" sequence="20"/>
+    <menuitem id="menu_quick_pay_rejected" name="Rejected"
+              parent="menu_quick_pay_root" action="action_quick_pay_rejected" sequence="30"/>
+    <menuitem id="menu_quick_pay_all" name="All Payments"
+              parent="menu_quick_pay_root" action="action_quick_pay_all" sequence="40"/>
+
+</odoo>
