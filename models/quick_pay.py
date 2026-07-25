@@ -209,6 +209,16 @@ class QuickPay(models.Model):
     @api.depends('batch_id', 'fee_type', 'fee_structure_id', 'phone')
     def _compute_fee_amount(self):
         for rec in self:
+            if rec.state not in ('draft', 'submitted'):
+                # Once verified/rejected/cancelled, this amount is history
+                # — e.g. after a Full Course Fee payment settles the
+                # balance, the enrollment's due_amount drops to 0, and
+                # blindly recomputing here (which happens automatically
+                # any time a dependency like 'phone' is touched, including
+                # on module upgrade) would overwrite the amount actually
+                # paid with 0. Leave the stored value exactly as it was
+                # at the time it was locked in.
+                continue
             breakdown = rec._resolve_fee_breakdown()
             rec.fee_amount = breakdown['inclusive']
             rec.base_amount = breakdown['exclusive']
@@ -225,7 +235,11 @@ class QuickPay(models.Model):
     @api.constrains('fee_amount', 'state')
     def _check_fee_amount(self):
         for rec in self:
-            if rec.state != 'draft' and rec.fee_amount <= 0:
+            # Only enforce this at the point of submission — once
+            # verified/rejected/cancelled, fee_amount is a locked
+            # historical value (see _compute_fee_amount) and must never
+            # be re-validated against the batch's *current* fee setup.
+            if rec.state == 'submitted' and rec.fee_amount <= 0:
                 raise ValidationError(_(
                     "No fee amount is configured for '%s' on batch %s. "
                     "Set it up in the batch's fee structures first."
