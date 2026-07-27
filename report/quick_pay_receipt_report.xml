@@ -9,6 +9,7 @@
         <field name="print_report_name">'Invoice - %s' % (object.name)</field>
         <field name="binding_model_id" ref="model_quick_pay"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="report.paperformat_euro"/>
     </record>
 
     <template id="report_quick_pay_receipt_document">
@@ -118,15 +119,15 @@
                                 <tr>
                                     <th style="width:8%;">Sl.No</th>
                                     <th>Particulars</th>
-                                    <th style="width:14%;text-align:right;">CGST ₹</th>
-                                    <th style="width:14%;text-align:right;">SGST ₹</th>
-                                    <th style="width:16%;text-align:right;">Fee ₹</th>
+                                    <th style="width:14%;text-align:right;">CGST &#8377;</th>
+                                    <th style="width:14%;text-align:right;">SGST &#8377;</th>
+                                    <th style="width:16%;text-align:right;">Fee &#8377;</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td>01</td>
-                                    <td><t t-esc="o.batch_id.name"/> — <span t-esc="o.fee_type"/></td>
+                                    <td><t t-esc="o.batch_id.name"/> &#8211; <span t-esc="o.fee_type"/></td>
                                     <td style="text-align:right;">
                                         <span t-esc="'{:,.2f}'.format(o.gst_amount / 2)"/>
                                     </td>
@@ -139,8 +140,8 @@
                                 </tr>
                                 <tr t-if="o.enrollment_id and o.enrollment_id.due_amount &gt; 0">
                                     <td colspan="5" style="font-size:11px;color:#b45309;">
-                                        Balance remaining on this enrollment: ₹<span t-esc="'{:,.2f}'.format(o.enrollment_id.due_amount)"/>
-                                        of a total course fee of ₹<span t-esc="'{:,.2f}'.format(o.enrollment_id.total_fee)"/>
+                                        Balance remaining on this enrollment: &#8377;<span t-esc="'{:,.2f}'.format(o.enrollment_id.due_amount)"/>
+                                        of a total course fee of &#8377;<span t-esc="'{:,.2f}'.format(o.enrollment_id.total_fee)"/>
                                     </td>
                                 </tr>
                                 <tr class="qp-inv-total-row">
