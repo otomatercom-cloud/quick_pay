@@ -1,3 +1,4 @@
+import base64
 import logging
 
 from odoo import _, api, fields, models
@@ -465,3 +466,26 @@ class QuickPay(models.Model):
         self.message_post(body=_(
             "Payment verified. Admission completed for %(name)s (Reg. No: %(reg)s)."
         ) % {'name': student.name, 'reg': student.registration_no})
+        self._generate_receipt_attachment()
+
+    def _generate_receipt_attachment(self):
+        """Auto-generate the PDF receipt as soon as a payment is
+        verified, attached to the record (visible in chatter/Files) so
+        it exists without anyone having to remember to print it."""
+        self.ensure_one()
+        try:
+            pdf_content, _fmt = self.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                'quick_pay.action_report_quick_pay_receipt', self.ids)
+        except Exception:
+            _logger.exception("Could not auto-generate receipt for %s", self.name)
+            return False
+        attachment = self.env['ir.attachment'].sudo().create({
+            'name': f"Receipt-{self.name}.pdf",
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_content),
+            'res_model': 'quick.pay',
+            'res_id': self.id,
+            'mimetype': 'application/pdf',
+        })
+        self.message_post(body=_("Payment receipt generated."), attachment_ids=[attachment.id])
+        return attachment

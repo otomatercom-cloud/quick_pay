@@ -239,6 +239,11 @@
                         Our Accounts team will verify your payment shortly.
                     </p>
                     <a href="/quick-pay" class="btn btn-outline-primary mt-3">Submit Another</a>
+                    <div class="mt-3">
+                        <a t-attf-href="/quick-pay/search?ref=#{ref}" class="text-muted" style="font-size:13px;">
+                            Track this payment / check my receipt →
+                        </a>
+                    </div>
                 </div>
             </div>
         </t>
@@ -388,6 +393,97 @@
                     });
                 })();
             </script>
+        </t>
+    </template>
+
+    <template id="portal_search" name="Quick Pay - Search My Payment">
+        <t t-call="website.layout">
+            <div id="wrap" class="quick-pay-wrap">
+                <div class="container py-5" style="max-width:680px;">
+                    <div class="text-center mb-4">
+                        <div class="qp-batch-kicker">Quick Pay</div>
+                        <h1 class="fw-bold">Search My Payment</h1>
+                        <p class="text-muted">
+                            Look up your payment history using your Payment
+                            Reference Number or your registered mobile number.
+                        </p>
+                    </div>
+
+                    <form action="/quick-pay/search" method="get" class="quick-pay-card mb-4">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label">Payment Reference Number</label>
+                                <input type="text" name="ref" class="form-control"
+                                       placeholder="e.g. QP000123" t-att-value="ref"/>
+                            </div>
+                            <div class="col-md-1 text-center text-muted">or</div>
+                            <div class="col-md-4">
+                                <label class="form-label">Registered Mobile Number</label>
+                                <input type="tel" name="phone" class="form-control"
+                                       placeholder="Mobile number" t-att-value="phone"/>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">Search</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div t-if="error" class="alert alert-warning" t-esc="error"/>
+
+                    <div t-if="balances" class="mb-4">
+                        <h2 style="font-size:18px;font-weight:700;">Outstanding Balance</h2>
+                        <div class="qp-fee-cards">
+                            <t t-foreach="balances" t-as="b">
+                                <a t-attf-href="/quick-pay?batch_id=#{b['batch_id']}&amp;fee_type=full_course&amp;phone=#{b['phone']}"
+                                   class="qp-fee-card qp-fee-card-highlight">
+                                    <div class="qp-fee-card-label">
+                                        <t t-esc="b['batch_name']"/>
+                                        <span class="badge text-bg-success ms-1">Your Balance</span>
+                                    </div>
+                                    <div class="qp-fee-card-amount">₹ <t t-esc="'{:,.2f}'.format(b['due_amount'])"/></div>
+                                    <div class="qp-fee-card-cta">Pay this balance →</div>
+                                </a>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div t-if="rows">
+                        <h2 style="font-size:18px;font-weight:700;">Payment History</h2>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Date</th>
+                                    <th>Batch</th>
+                                    <th>Fee Type</th>
+                                    <th class="text-end">Amount ₹</th>
+                                    <th>Status</th>
+                                    <th>Receipt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="rows" t-as="r">
+                                    <td><t t-esc="r['name']"/></td>
+                                    <td><t t-esc="r['date']"/></td>
+                                    <td><t t-esc="r['batch_name']"/></td>
+                                    <td><t t-esc="r['fee_type_label']"/></td>
+                                    <td class="text-end"><t t-esc="'{:,.2f}'.format(r['amount'])"/></td>
+                                    <td>
+                                        <span t-attf-class="badge #{'text-bg-success' if r['state'] == 'converted' else 'text-bg-secondary' if r['state'] == 'submitted' else 'text-bg-danger' if r['state'] == 'rejected' else 'text-bg-light'}">
+                                            <t t-esc="r['state_label']"/>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a t-if="r['state'] == 'converted'" t-attf-href="/quick-pay/receipt/#{r['name']}"
+                                           target="_blank" class="btn btn-sm btn-outline-primary">Download</a>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </t>
     </template>
 

@@ -195,3 +195,72 @@ class QuickPayPortal(http.Controller):
                 })
         return {'status': 'new', 'fees': fees}
 
+    @http.route('/quick-pay/search', type='http', auth='public', website=True, sitemap=True)
+    def quick_pay_search(self, ref=None, phone=None, **kw):
+        """Students look up their own payment history and any
+        outstanding balance using either their Payment Reference Number
+        or their registered mobile number — no login required, matching
+        the rest of Quick Pay's public flow."""
+        ref = (ref or '').strip()
+        phone = (phone or '').strip()
+        results = None
+        balances = []
+        error = None
+
+        if ref or phone:
+            Payment = request.env['quick.pay'].sudo()
+            if ref:
+                results = Payment.search([('name', '=', ref)], limit=1)
+            else:
+                results = Payment.search(
+                    [('phone', '=', phone)], order='submission_date desc', limit=50)
+
+            if not results:
+                error = _("No payment records found for that reference number or mobile number.")
+            else:
+                lookup_phone = phone or results[:1].phone
+                lead = request.env['leads.logic'].sudo().search(
+                    [('phone_number', '=', lookup_phone)], limit=1)
+                if lead and lead.student_id:
+                    for enr in lead.student_id.enrollment_ids:
+                        if enr.due_amount > 0:
+                            balances.append({
+                                'batch_id': enr.batch_id.id,
+                                'batch_name': enr.batch_id.name,
+                                'due_amount': enr.due_amount,
+                                'phone': lookup_phone,
+                            })
+
+        state_labels = dict(request.env['quick.pay']._fields['state'].selection)
+        fee_type_labels = dict(FEE_TYPES)
+        rows = [{
+            'name': r.name,
+            'date': r.submission_date.strftime('%d-%b-%Y') if r.submission_date else '',
+            'batch_name': r.batch_id.name,
+            'fee_type_label': fee_type_labels.get(r.fee_type, r.fee_type),
+            'amount': r.fee_amount,
+            'state': r.state,
+            'state_label': state_labels.get(r.state, r.state),
+        } for r in (results or [])]
+
+        return request.render('quick_pay.portal_search', {
+            'ref': ref, 'phone': phone,
+            'rows': rows, 'balances': balances, 'error': error,
+        })
+
+    @http.route('/quick-pay/receipt/<string:ref>', type='http', auth='public', website=True)
+    def quick_pay_receipt_download(self, ref, **kw):
+        """Public receipt download — gated by knowing the reference
+        number itself (the same identifier used throughout the search
+        flow), not a raw sequential database id."""
+        record = request.env['quick.pay'].sudo().search([('name', '=', ref)], limit=1)
+        if not record or record.state != 'converted':
+            return request.not_found()
+        pdf_content, _fmt = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+            'quick_pay.action_report_quick_pay_receipt', record.ids)
+        headers = [
+            ('Content-Type', 'application/pdf'),
+            ('Content-Disposition', f'inline; filename="Receipt-{record.name}.pdf"'),
+        ]
+        return request.make_response(pdf_content, headers=headers)
+
