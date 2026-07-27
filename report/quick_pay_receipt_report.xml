@@ -15,14 +15,61 @@
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
                 <t t-call="web.external_layout">
-                    <div class="page">
-                        <h2>Payment Receipt</h2>
-                        <table class="table table-sm" style="width:100%;">
+                    <div class="page qp-receipt">
+                        <style>
+                            .qp-receipt { font-family: Arial, Helvetica, sans-serif; }
+                            .qp-receipt .qp-letterhead {
+                                display: flex; align-items: center; gap: 16px;
+                                border-bottom: 3px solid #1e3a8a; padding-bottom: 14px; margin-bottom: 18px;
+                            }
+                            .qp-receipt .qp-letterhead img { max-height: 64px; }
+                            .qp-receipt .qp-company-name { font-size: 20px; font-weight: 700; color: #1e3a8a; margin: 0; }
+                            .qp-receipt .qp-company-address { font-size: 11px; color: #555; margin: 2px 0 0; }
+                            .qp-receipt .qp-title-bar {
+                                background: #1e3a8a; color: #ffffff; text-align: center;
+                                padding: 8px 0; font-size: 16px; font-weight: 700;
+                                letter-spacing: 1px; margin-bottom: 16px;
+                            }
+                            .qp-receipt table.qp-info-table td { padding: 5px 6px; font-size: 13px; }
+                            .qp-receipt table.qp-fee-table th {
+                                background: #eef2ff; font-size: 12px; padding: 6px;
+                            }
+                            .qp-receipt table.qp-fee-table td { padding: 6px; font-size: 13px; }
+                            .qp-receipt .qp-total-row td { font-weight: 700; border-top: 2px solid #1e3a8a; }
+                            .qp-receipt .qp-balance-box {
+                                background: #fff7ed; border: 1px solid #fdba74;
+                                border-radius: 6px; padding: 10px 14px; margin-top: 14px; font-size: 13px;
+                            }
+                            .qp-receipt .qp-balance-box.qp-settled {
+                                background: #f0fdf4; border-color: #86efac;
+                            }
+                            .qp-receipt .qp-footer-note {
+                                margin-top: 28px; font-size: 11px; color: #666;
+                                border-top: 1px solid #ddd; padding-top: 10px;
+                            }
+                            .qp-receipt .qp-signature { margin-top: 40px; font-size: 12px; text-align: right; }
+                        </style>
+
+                        <div class="qp-letterhead">
+                            <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"/>
+                            <div>
+                                <p class="qp-company-name"><t t-esc="o.company_id.name"/></p>
+                                <p class="qp-company-address">
+                                    <t t-esc="o.company_id.partner_id.street or ''"/><t t-if="o.company_id.partner_id.street2">, <t t-esc="o.company_id.partner_id.street2"/></t><t t-if="o.company_id.partner_id.city">, <t t-esc="o.company_id.partner_id.city"/></t><t t-if="o.company_id.partner_id.state_id">, <t t-esc="o.company_id.partner_id.state_id.name"/></t><t t-if="o.company_id.partner_id.zip"> - <t t-esc="o.company_id.partner_id.zip"/></t>
+                                    <t t-if="o.company_id.vat"> · GSTIN: <t t-esc="o.company_id.vat"/></t>
+                                    <t t-if="o.company_id.phone"> · Ph: <t t-esc="o.company_id.phone"/></t>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="qp-title-bar">PAYMENT RECEIPT</div>
+
+                        <table class="qp-info-table" style="width:100%;">
                             <tr>
-                                <td><strong>Reference</strong></td>
-                                <td><span t-field="o.name"/></td>
-                                <td><strong>Date</strong></td>
-                                <td><span t-field="o.submission_date"/></td>
+                                <td style="width:25%;"><strong>Reference</strong></td>
+                                <td style="width:25%;"><span t-field="o.name"/></td>
+                                <td style="width:25%;"><strong>Date</strong></td>
+                                <td style="width:25%;"><span t-field="o.submission_date"/></td>
                             </tr>
                             <tr>
                                 <td><strong>Student</strong></td>
@@ -43,22 +90,70 @@
                                 <td><span t-field="o.state"/></td>
                             </tr>
                         </table>
-                        <table class="table table-bordered mt-3" style="width:100%;">
-                            <tr>
-                                <th>Description</th>
-                                <th style="text-align:right;">Amount ₹</th>
-                            </tr>
-                            <tr>
-                                <td><span t-field="o.fee_type"/></td>
-                                <td style="text-align:right;">
-                                    <span t-field="o.fee_amount" t-options="{'widget': 'float', 'precision': 2}"/>
-                                </td>
-                            </tr>
+
+                        <table class="table table-bordered qp-fee-table mt-3" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th style="text-align:right;">Base Amount ₹</th>
+                                    <th style="text-align:right;">GST</th>
+                                    <th style="text-align:right;">GST Amount ₹</th>
+                                    <th style="text-align:right;">Total ₹</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span t-field="o.fee_type"/></td>
+                                    <td style="text-align:right;">
+                                        <span t-field="o.base_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <span t-esc="o.gst_rate"/>%
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <span t-field="o.gst_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <span t-field="o.fee_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                    </td>
+                                </tr>
+                                <tr class="qp-total-row">
+                                    <td colspan="4" style="text-align:right;">Amount Paid</td>
+                                    <td style="text-align:right;">
+                                        ₹ <span t-field="o.fee_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
-                        <p t-if="o.verified_by" class="mt-4 text-muted">
+
+                        <div t-if="o.enrollment_id"
+                             t-attf-class="qp-balance-box #{'qp-settled' if o.enrollment_id.due_amount &lt;= 0 else ''}">
+                            <t t-if="o.enrollment_id.due_amount &gt; 0">
+                                <strong>Balance Remaining:</strong>
+                                ₹ <span t-field="o.enrollment_id.due_amount" t-options="{'widget': 'float', 'precision': 2}"/>
+                                out of a total course fee of
+                                ₹ <span t-field="o.enrollment_id.total_fee" t-options="{'widget': 'float', 'precision': 2}"/>.
+                            </t>
+                            <t t-else="">
+                                <strong>✓ Fully Paid</strong> — no balance remaining on this enrollment.
+                            </t>
+                        </div>
+
+                        <p t-if="o.verified_by" class="mt-3 text-muted" style="font-size:12px;">
                             Verified by <span t-field="o.verified_by.name"/>
                             on <span t-field="o.verified_date"/>.
                         </p>
+
+                        <div class="qp-signature">
+                            _____________________<br/>
+                            Authorized Signatory
+                        </div>
+
+                        <div class="qp-footer-note">
+                            This is a computer-generated receipt and is valid proof of payment.
+                            Fees once paid are non-refundable as per institute policy. For any
+                            queries regarding this payment, please quote the reference number above.
+                        </div>
                     </div>
                 </t>
             </t>

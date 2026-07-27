@@ -32,6 +32,8 @@ class QuickPay(models.Model):
     _rec_name = 'name'
 
     name = fields.Char(string='Reference', default='New', readonly=True, copy=False)
+    company_id = fields.Many2one(
+        'res.company', default=lambda self: self.env.company, required=True)
 
     student_name = fields.Char(required=True, tracking=True)
     phone = fields.Char(string='Registered Mobile Number', required=True, tracking=True)
