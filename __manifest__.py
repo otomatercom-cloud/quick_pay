@@ -14,7 +14,7 @@
     'website': 'https://www.otomater.com',
     'category': 'Education',
     'license': 'LGPL-3',
-    'depends': ['base', 'mail', 'website', 'report', 'student_details_19', 'custom_leads_19'],
+    'depends': ['base', 'mail', 'website', 'student_details_19', 'custom_leads_19'],
     'data': [
         'security/quick_pay_security.xml',
         'security/ir.model.access.csv',
