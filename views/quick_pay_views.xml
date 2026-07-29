@@ -44,6 +44,7 @@
                 <field name="fee_type" widget="badge"/>
                 <field name="fee_amount" string="Amount ₹" sum="Total ₹"/>
                 <field name="existing_student_id" string="Matches" optional="show"/>
+                <field name="admission_officer_id" optional="show"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'converted'"
                        decoration-info="state == 'submitted'"
@@ -138,6 +139,7 @@
                             <field name="phone"/>
                             <field name="place"/>
                             <field name="email"/>
+                            <field name="admission_officer_id"/>
                         </group>
                         <group string="Payment">
                             <field name="batch_id"/>

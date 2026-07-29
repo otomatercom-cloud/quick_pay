@@ -16,6 +16,11 @@ FEE_TYPES = [
 
 class QuickPayPortal(http.Controller):
 
+    def _get_admission_officers(self):
+        return request.env['hr.employee'].sudo().search([
+            ('id', 'in', request.env['lead.team.member'].sudo().search([]).mapped('employee_id').ids)
+        ])
+
     @http.route('/quick-pay', type='http', auth='public', website=True, sitemap=True)
     def quick_pay_form(self, batch_id=None, fee_type=None, phone=None, **kw):
         batches = request.env['student.batch'].sudo().search([('active', '=', True)])
@@ -29,6 +34,7 @@ class QuickPayPortal(http.Controller):
         return request.render('quick_pay.portal_quick_pay_form', {
             'batches': batches,
             'fee_types': FEE_TYPES,
+            'officers': self._get_admission_officers(),
             'error': None,
             'form_values': form_values,
         })
@@ -80,6 +86,7 @@ class QuickPayPortal(http.Controller):
             return request.render('quick_pay.portal_quick_pay_form', {
                 'batches': batches,
                 'fee_types': FEE_TYPES,
+                'officers': self._get_admission_officers(),
                 'error': message,
                 'form_values': post,
             })
@@ -116,6 +123,8 @@ class QuickPayPortal(http.Controller):
         }
         if fee_type == 'full_course' and post.get('fee_structure_id'):
             vals['fee_structure_id'] = int(post['fee_structure_id'])
+        if post.get('admission_officer_id'):
+            vals['admission_officer_id'] = int(post['admission_officer_id'])
 
         try:
             record = request.env['quick.pay'].sudo().create(vals)

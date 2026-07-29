@@ -48,6 +48,19 @@
                             <input type="email" name="email" class="form-control"
                                    t-att-value="form_values.get('email')"/>
                         </div>
+                        <div class="mb-3" t-if="officers">
+                            <label class="form-label">Admission Officer (optional)</label>
+                            <select name="admission_officer_id" class="form-select">
+                                <option value="">-- Not Applicable --</option>
+                                <t t-foreach="officers" t-as="o">
+                                    <option t-att-value="o.id"
+                                            t-att-selected="'selected' if str(o.id) == str(form_values.get('admission_officer_id')) else None">
+                                        <t t-esc="o.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                            <div class="form-text">Who helped you with this admission?</div>
+                        </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">

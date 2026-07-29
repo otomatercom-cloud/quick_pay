@@ -39,6 +39,13 @@ class QuickPay(models.Model):
     phone = fields.Char(string='Registered Mobile Number', required=True, tracking=True)
     place = fields.Char()
     email = fields.Char()
+    admission_officer_id = fields.Many2one(
+        'hr.employee', string='Admission Officer',
+        domain=lambda self: [
+            ('id', 'in', self.env['lead.team.member'].sudo().search([]).mapped('employee_id').ids)
+        ],
+        help="Which Admission Officer helped this student — set as the "
+             "Lead Owner if a new lead is created from this submission.")
 
     batch_id = fields.Many2one(
         'student.batch', string='Batch', required=True,
@@ -350,7 +357,7 @@ class QuickPay(models.Model):
         lead = Lead.search([('phone_number', '=', self.phone)], limit=1)
         if lead:
             return lead
-        return Lead.create({
+        vals = {
             'leads_source': self._get_or_create_quick_pay_source().id,
             'name': self.student_name,
             'phone_number': self.phone,
@@ -358,7 +365,10 @@ class QuickPay(models.Model):
             'place': self.place or False,
             'batch_preference': self.batch_id.name,
             'state': 'new',
-        })
+        }
+        if self.admission_officer_id:
+            vals['lead_owner'] = self.admission_officer_id.id
+        return Lead.create(vals)
 
     def _resolve_admission_fee_structure(self):
         """The fee.structure used to actually create the enrollment — this
