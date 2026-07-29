@@ -71,7 +71,7 @@ class QuickPayPortal(http.Controller):
         }
 
     @http.route('/quick-pay/submit', type='http', auth='public', website=True,
-                methods=['POST'], csrf=True)
+                methods=['POST'], csrf=False)
     def quick_pay_submit(self, **post):
         Batch = request.env['student.batch'].sudo()
         batches = Batch.search([('active', '=', True)])
