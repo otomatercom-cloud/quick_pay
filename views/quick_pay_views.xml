@@ -227,5 +227,8 @@
               parent="menu_quick_pay_root" action="action_quick_pay_rejected" sequence="30"/>
     <menuitem id="menu_quick_pay_all" name="All Payments"
               parent="menu_quick_pay_root" action="action_quick_pay_all" sequence="40"/>
+    <menuitem id="menu_quick_pay_bulk_import" name="Bulk Import Historical Payments"
+              parent="menu_quick_pay_root" action="action_quick_pay_bulk_import_wizard" sequence="50"
+              groups="quick_pay.group_quick_pay_manager"/>
 
 </odoo>

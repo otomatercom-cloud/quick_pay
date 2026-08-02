@@ -21,6 +21,7 @@
         'data/quick_pay_sequence.xml',
         'data/quick_pay_source.xml',
         'wizard/quick_pay_reject_wizard_views.xml',
+        'views/quick_pay_bulk_import_views.xml',
         'views/quick_pay_views.xml',
         'views/quick_pay_portal_templates.xml',
         'views/batch_views.xml',

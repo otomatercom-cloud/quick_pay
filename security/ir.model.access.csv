@@ -3,3 +3,4 @@ access_quick_pay_user,quick.pay.user,model_quick_pay,group_quick_pay_user,1,0,0,
 access_quick_pay_accounts,quick.pay.accounts,model_quick_pay,group_quick_pay_accounts,1,1,1,0
 access_quick_pay_manager,quick.pay.manager,model_quick_pay,group_quick_pay_manager,1,1,1,1
 access_quick_pay_reject_wizard,quick.pay.reject.wizard,model_quick_pay_reject_wizard,group_quick_pay_accounts,1,1,1,1
+access_quick_pay_bulk_import_wizard,quick.pay.bulk.import.wizard,model_quick_pay_bulk_import_wizard,group_quick_pay_manager,1,1,1,1

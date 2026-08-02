@@ -382,16 +382,15 @@ class QuickPay(models.Model):
         return self.batch_id.fee_structure_ids.filtered(
             lambda f: f.fee_type in ('lumpsum', 'installment'))[:1]
 
-    def _do_verify(self):
-        self.ensure_one()
-        lead = self._find_or_create_lead()
-        course_fs = self._resolve_admission_fee_structure()
-        if not course_fs:
-            raise UserError(_(
-                "No course fee structure (lump sum/installment) is "
-                "configured for batch '%s'. Set one up before verifying."
-            ) % self.batch_id.name)
-
+    @api.model
+    def _ensure_student_and_enrollment(self, lead, batch, course_fs, source_label=''):
+        """Finds or creates the student.details for this lead, and finds
+        or creates their enrollment in this specific batch. Shared by
+        _do_verify() (the normal portal payment flow) and the bulk
+        historical-payment import wizard — both need exactly this same
+        "make sure the student+enrollment exist" step, just from
+        different entry points, so it lives here once rather than twice.
+        Returns (student, enrollment)."""
         if lead.student_profile_created or lead.student_id:
             student = lead.student_id
         else:
@@ -400,11 +399,12 @@ class QuickPay(models.Model):
             # wizard instance — done inline rather than calling
             # action_confirm_admission() directly because it branches on
             # an ir.config_parameter ('admission_batch_required') that
-            # Quick Pay must not depend on: Quick Pay always has a batch
-            # and a fee plan resolved, so it always wants full admission.
+            # this flow must not depend on: both callers always have a
+            # batch and a fee plan resolved already, so it always wants
+            # full admission.
             wiz = self.env['lead.admission.wizard'].new({
                 'lead_id': lead.id,
-                'batch_id': self.batch_id.id,
+                'batch_id': batch.id,
                 'fee_structure_id': course_fs.id,
             })
             student = self.env['student.details'].create(wiz._prepare_student_vals())
@@ -418,12 +418,12 @@ class QuickPay(models.Model):
                 'lead_quality': 'admission',
                 'state': 'qualified',
                 'current_status': 'admission',
-                'admission_batch': self.batch_id.name,
+                'admission_batch': batch.name,
                 'student_name': student.name,
             })
             lead.message_post(body=_(
                 "Student admission completed via Quick Pay (%s)."
-            ) % self.name)
+            ) % source_label)
 
         # Ensure an enrollment exists for THIS batch specifically — this
         # must not depend on whether the student record is brand-new.
@@ -432,7 +432,7 @@ class QuickPay(models.Model):
         # created here the first time they pay towards *this* batch,
         # otherwise the payment has nothing to attach to and the
         # outstanding balance never appears anywhere.
-        enrollment = student.enrollment_ids.filtered(lambda e: e.batch_id == self.batch_id)[:1]
+        enrollment = student.enrollment_ids.filtered(lambda e: e.batch_id == batch)[:1]
         if not enrollment:
             # total_fee = course fee + admission fee ADDED TOGETHER — they
             # are two separate charges (registration fee + tuition), not
@@ -441,17 +441,31 @@ class QuickPay(models.Model):
             # ₹3500 balance toward that combined total.
             course_total = course_fs.total_fee_amount if course_fs.fee_type == 'installment' \
                 else course_fs.amount_inclusive
-            admission_fs = self.batch_id.fee_structure_ids.filtered(
+            admission_fs = batch.fee_structure_ids.filtered(
                 lambda f: f.fee_type == 'admission')
             grand_total = course_total + sum(admission_fs.mapped('amount_inclusive'))
             enrollment = self.env['student.enrollment'].create({
                 'student_id': student.id,
-                'batch_id': self.batch_id.id,
+                'batch_id': batch.id,
                 'fee_structure_id': course_fs.id,
                 'total_fee': grand_total,
                 'fee_type': course_fs.fee_type,
                 'gst_rate': course_fs.gst_rate,
             })
+        return student, enrollment
+
+    def _do_verify(self):
+        self.ensure_one()
+        lead = self._find_or_create_lead()
+        course_fs = self._resolve_admission_fee_structure()
+        if not course_fs:
+            raise UserError(_(
+                "No course fee structure (lump sum/installment) is "
+                "configured for batch '%s'. Set one up before verifying."
+            ) % self.batch_id.name)
+
+        student, enrollment = self._ensure_student_and_enrollment(
+            lead, self.batch_id, course_fs, source_label=self.name)
 
         payment = False
         if self.fee_amount > 0 and enrollment:

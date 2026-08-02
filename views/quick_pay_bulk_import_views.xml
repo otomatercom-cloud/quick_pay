@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_quick_pay_bulk_import_wizard_form" model="ir.ui.view">
+        <field name="name">quick.pay.bulk.import.wizard.form</field>
+        <field name="model">quick.pay.bulk.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Import Historical Payments">
+                <div class="alert alert-info" role="alert">
+                    Upload an .xlsx with columns: <strong>Name, Number, Email, Batch, Paid</strong>.
+                    Email is optional; the rest are required. "Batch" must match an existing
+                    batch's name exactly. This creates/finds the student and their enrollment
+                    for that batch, then records the "Paid" amount as a payment — the
+                    outstanding balance shown everywhere (dashboards, batch pages) updates
+                    automatically from this.
+                </div>
+                <group>
+                    <field name="import_file" filename="import_filename"/>
+                    <field name="import_filename" invisible="1"/>
+                </group>
+                <group string="Result" invisible="not result_summary">
+                    <field name="result_summary" nolabel="1" readonly="1"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Import"
+                            class="btn-primary" invisible="result_summary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_quick_pay_bulk_import_wizard" model="ir.actions.act_window">
+        <field name="name">Bulk Import Historical Payments</field>
+        <field name="res_model">quick.pay.bulk.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
