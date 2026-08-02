@@ -114,9 +114,13 @@ class QuickPayBulkImportWizard(models.TransientModel):
                 self.env['student.fee.payment'].create({
                     'enrollment_id': enrollment.id,
                     'amount': paid_amount,
-                    'payment_mode': 'other',
+                    'payment_mode': 'cash',
                     'receipt_no': 'BULK-IMPORT',
-                    'remarks': _('Bulk historical payment import (row %d).') % row_num,
+                    'remarks': _(
+                        'Bulk historical payment import (row %d). Payment mode set to '
+                        'Cash by default — actual mode not specified in the source sheet, '
+                        'correct it on the payment record if it matters for your records.'
+                    ) % row_num,
                 })
                 imported += 1
             except Exception as exc:  # noqa: BLE001
