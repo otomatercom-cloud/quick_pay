@@ -108,18 +108,19 @@ export class FeeDashboard extends Component {
 
     // ── drill-down ──────────────────────────────────────────────────
     openBatchRequests(batch) {
+        // Shows every enrollment for this batch — paid, partial, and
+        // unpaid — regardless of how the payment was recorded (Quick
+        // Pay portal submission, bulk historical import, or manual
+        // entry). Filtering to quick.pay records here would silently
+        // miss anything that didn't come through the public form,
+        // which is most bulk-imported historical payments by design.
         this.action.doAction({
             type: "ir.actions.act_window",
-            name: `Quick Pay — ${batch.batch_name}`,
-            res_model: "quick.pay",
+            name: `Payments — ${batch.batch_name}`,
+            res_model: "student.enrollment",
             view_mode: "list,form",
             views: [[false, "list"], [false, "form"]],
-            domain: [
-                ["batch_id", "=", batch.batch_id],
-                ["state", "=", "converted"],
-                ["verified_date", ">=", `${this.state.dateFrom} 00:00:00`],
-                ["verified_date", "<=", `${this.state.dateTo} 23:59:59`],
-            ],
+            domain: [["batch_id", "=", batch.batch_id]],
             target: "current",
         });
     }
